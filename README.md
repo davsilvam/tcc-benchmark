@@ -56,3 +56,11 @@ Spring Boot (referência) → ASP.NET Core → NestJS → Django → Laravel. Os
 compartilham o modelo de ORM com rastreamento de entidades, o que torna a tradução direta;
 Django e Laravel exigem atenção redobrada ao número de consultas por requisição, por
 carregarem associações de forma tardia por padrão.
+
+## Licença
+
+[MIT](LICENSE) — © 2026 David Silva.
+
+As dependências de cada implementação mantêm as próprias licenças. Nenhuma é redistribuída
+neste repositório: são instaladas na construção das imagens, a partir dos arquivos de
+bloqueio versionados.
