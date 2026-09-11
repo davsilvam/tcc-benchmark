@@ -1,0 +1,16 @@
+=== runtime ===
+v24.21.0
+11.19.0
+=== dependencias instaladas (npm list --omit=dev) ===
+nestjs@0.0.1 /app
++-- @nestjs/common@12.0.1
++-- @nestjs/core@12.0.1
++-- @nestjs/platform-express@12.0.1
++-- @nestjs/typeorm@12.0.1
++-- class-transformer@0.5.1
++-- class-validator@0.15.1
++-- pg@8.23.0
++-- reflect-metadata@0.2.2
++-- rxjs@7.8.2
+`-- typeorm@1.1.1
+

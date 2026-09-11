@@ -1,0 +1,28 @@
+=== runtime ===
+
+Host:
+  Version:      10.0.12
+  Architecture: x64
+  Commit:       95017c711e
+  RID:          linux-x64
+
+.NET SDKs installed:
+  No SDKs were found.
+
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]
+=== pacotes (dotnet list package --include-transitive) ===
+  Determining projects to restore...
+  Restored /p/BookApi.csproj (in 4.25 sec).
+Project 'BookApi' has the following package references
+   [net10.0]: 
+   Top-level Package                            Requested   Resolved
+   > Npgsql.EntityFrameworkCore.PostgreSQL      10.0.3      10.0.3  
+
+   Transitive Package                                Resolved
+   > Microsoft.EntityFrameworkCore                   10.0.4  
+   > Microsoft.EntityFrameworkCore.Abstractions      10.0.4  
+   > Microsoft.EntityFrameworkCore.Analyzers         10.0.4  
+   > Microsoft.EntityFrameworkCore.Relational        10.0.4  
+   > Npgsql                                          10.0.3  
+

@@ -1,0 +1,7 @@
+# Scaffolding NAO MODIFICADO de django — excluido da contagem SLOC-B.
+# Derivado por comparacao byte a byte (sha256) com o scaffold regerado
+# pela mesma ferramenta e versao. Ver scripts/count-sloc.sh.
+apps/django/bookapi/__init__.py
+apps/django/bookapi/asgi.py
+apps/django/bookapi/wsgi.py
+apps/django/manage.py

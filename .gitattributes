@@ -1,0 +1,8 @@
+# Finais de linha LF em todo o repositório.
+#
+# Não é preferência de estilo: os entrypoint.sh e scripts/*.sh são copiados para
+# contêineres Linux, e com core.autocrlf=true (padrão do Git para Windows) um clone
+# converteria esses arquivos para CRLF — e o contêiner falharia na partida com
+# "/bin/sh^M: not found". Fixar LF aqui torna o aparato reproduzível a partir de
+# qualquer clone, em qualquer sistema operacional.
+* text=auto eol=lf

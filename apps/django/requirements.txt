@@ -1,0 +1,6 @@
+# Versões fixadas — conferidas em 10/09/2026, ver docs/versoes-e-configuracao.md.
+# psycopg[pool] é requisito do pool de conexões do Django 5.1+ (seção 6.1); o pool não
+# está disponível com psycopg2.
+Django==6.1.1
+psycopg[binary,pool]==3.3.5
+gunicorn==26.2.0

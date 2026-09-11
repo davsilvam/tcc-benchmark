@@ -1,0 +1,7 @@
+=== cloc ===
+1.98
+
+=== regra de exclusão (seção 7) ===
+(/node_modules/|/vendor/|/target/|/dist/|/\.git/|/\.idea/|/obj/|/bin/|/(Dockerfile|\.dockerignore|\.gitignore|\.gitattributes|\.editorconfig|\.npmrc|entrypoint\.sh|package-lock\.json|composer\.lock|robots\.txt)$|\.tsbuildinfo$|\.md$)
+
+coletado em: 2026-09-10T18:36:32-03:00

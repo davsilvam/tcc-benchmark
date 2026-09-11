@@ -1,0 +1,6 @@
+# Scaffolding NAO MODIFICADO de springboot — excluido da contagem SLOC-B.
+# ATENCAO: unica lista NAO derivada por comparacao. O projeto Spring Boot ja existia no
+# repositorio e nao foi gerado nesta sessao, entao nao ha scaffold original para comparar.
+# BookApiApplication.java e identico ao template que o Spring Initializr emite (classe
+# principal com @SpringBootApplication e main). Os demais arquivos foram escritos a mao.
+apps/spring-boot/src/main/java/com/tcc/bookapi/BookApiApplication.java

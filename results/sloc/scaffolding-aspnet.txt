@@ -1,0 +1,3 @@
+# Scaffolding NAO MODIFICADO de aspnet — excluido da contagem SLOC-B.
+# Derivado por comparacao byte a byte (sha256) com o scaffold regerado
+# pela mesma ferramenta e versao. Ver scripts/count-sloc.sh.

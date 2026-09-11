@@ -1,0 +1,23 @@
+# Dependências — reinstaladas na construção de cada imagem, a partir dos arquivos de
+# bloqueio (package-lock.json, composer.lock), que SÃO versionados.
+node_modules/
+vendor/
+
+# Saídas de compilação — geradas dentro dos contêineres
+target/
+dist/
+bin/
+obj/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+
+# Temporários dos scripts de medição
+results/sloc/.*.tmp
+
+# Editores e sistema operacional
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

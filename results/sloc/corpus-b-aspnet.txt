@@ -1,0 +1,7 @@
+apps/aspnet/Api/BookController.cs
+apps/aspnet/Api/Dtos.cs
+apps/aspnet/BookApi.csproj
+apps/aspnet/Domain/BookDbContext.cs
+apps/aspnet/Domain/Entities.cs
+apps/aspnet/Program.cs
+apps/aspnet/appsettings.json

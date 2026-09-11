@@ -1,0 +1,32 @@
+# Configuração padronizada — seção 6 da especificação funcional.
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tccbench}
+    username: ${DB_USER:bench}
+    password: ${DB_PASSWORD:bench}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 10
+  jpa:
+    hibernate:
+      ddl-auto: none          # esquema criado por SQL puro (secao 2.4)
+    open-in-view: false       # impede consultas tardias fora do controlador
+    properties:
+      hibernate:
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  compression:
+    enabled: false
+  tomcat:
+    threads:
+      max: 200
+
+logging:
+  level:
+    root: WARN

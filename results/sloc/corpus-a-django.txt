@@ -1,0 +1,12 @@
+apps/django/api/__init__.py
+apps/django/api/forms.py
+apps/django/api/models.py
+apps/django/api/views.py
+apps/django/bookapi/__init__.py
+apps/django/bookapi/asgi.py
+apps/django/bookapi/settings.py
+apps/django/bookapi/urls.py
+apps/django/bookapi/wsgi.py
+apps/django/gunicorn.conf.py
+apps/django/manage.py
+apps/django/requirements.txt

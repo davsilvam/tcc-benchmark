@@ -1,0 +1,20 @@
+=== PostgreSQL ===
+PostgreSQL 16.13 (Debian 16.13-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+=== PostgreSQL — agrupamento e parametros relevantes ===
+      name       |             setting             
+-----------------+---------------------------------
+ log_statement   | none
+ max_connections | 200
+ server_version  | 16.13 (Debian 16.13-1.pgdg13+1)
+ shared_buffers  | 65536
+(4 rows)
+
+=== k6 ===
+k6.exe v2.2.0 (commit/00a9a1b7f5, go1.26.5, windows/amd64)
+=== cloc ===
+scripts/collect-versions.sh: line 84: cloc: command not found
+cloc nao encontrado no PATH — usar: docker run --rm -v "$PWD:/t" aldanial/cloc --version
+=== Docker ===
+Docker version 29.7.2, build a7dcaa6
+=== coletado em ===
+2026-09-10T20:02:24-03:00

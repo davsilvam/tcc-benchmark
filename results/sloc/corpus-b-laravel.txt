@@ -1,0 +1,10 @@
+apps/laravel/.env
+apps/laravel/app/Http/Controllers/BookController.php
+apps/laravel/app/Models/Author.php
+apps/laravel/app/Models/Book.php
+apps/laravel/bootstrap/app.php
+apps/laravel/config/database.php
+apps/laravel/docker/nginx.conf
+apps/laravel/docker/php-fpm.conf
+apps/laravel/docker/php.ini
+apps/laravel/routes/api.php

@@ -1,0 +1,132 @@
+# Ambiente controlado de medição — TCC
+#
+# IMPORTANTE: apenas um framework é executado por vez. Cada serviço de aplicação está
+# atrás de um profile, de modo que `docker compose up` sem profile sobe somente o banco.
+#
+#   docker compose up -d postgres
+#   docker compose --profile springboot up -d --build
+#   ...coleta...
+#   docker compose --profile springboot down
+#
+# Os limites de 2 vCPU e 2 GB por contêiner de aplicação correspondem à seção 3.4 da
+# monografia. O contêiner do PostgreSQL recebe limites próprios e permanece ativo durante
+# toda a campanha de coleta, para que o SGBD seja idêntico entre os tratamentos.
+
+name: tcc-bench
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: tcc-postgres
+    environment:
+      POSTGRES_DB: tccbench
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: bench
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=512MB
+    # log_statement NÃO é passado na linha de comando: parâmetros de linha de comando têm
+    # precedência sobre postgresql.auto.conf, e o `ALTER SYSTEM SET log_statement='all'`
+    # de scripts/verify-queries.sh (critério 8.2) seria silenciosamente ignorado. O padrão
+    # do PostgreSQL já é 'none'; a verificação liga e desliga por ALTER SYSTEM + reload.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bench -d tccbench"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+  springboot:
+    profiles: [springboot]
+    build: ../apps/spring-boot
+    container_name: tcc-springboot
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: tccbench
+      DB_USER: bench
+      DB_PASSWORD: bench
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+  django:
+    profiles: [django]
+    build: ../apps/django
+    container_name: tcc-django
+    environment: &appenv
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: tccbench
+      DB_USER: bench
+      DB_PASSWORD: bench
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+  nestjs:
+    profiles: [nestjs]
+    build: ../apps/nestjs
+    container_name: tcc-nestjs
+    environment: *appenv
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+  laravel:
+    profiles: [laravel]
+    build: ../apps/laravel
+    container_name: tcc-laravel
+    environment: *appenv
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+  aspnet:
+    profiles: [aspnet]
+    build: ../apps/aspnet
+    container_name: tcc-aspnet
+    environment: *appenv
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cpus: 2
+    mem_limit: 2g
+    networks: [bench]
+
+networks:
+  bench:
+    driver: bridge
