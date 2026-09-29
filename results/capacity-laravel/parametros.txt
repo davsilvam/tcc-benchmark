@@ -1,0 +1,4 @@
+iniciado_em=2026-09-25T13:27:20-03:00
+start=100 step=100 step_s=20 max_rate=1500
+p95_max=nao_informado p95_safety=2000 reps=3
+warmup=150s@100rps frameworks=laravel

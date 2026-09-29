@@ -1,0 +1,7 @@
+rate_target,achieved_rps,p95_ms,avg_ms,error_rate,dropped,vus_max_used
+100,100.05,9.46,6.26,0.000000,0,200
+200,200.05,8.80,5.65,0.000000,0,200
+300,300.00,9.36,5.96,0.000000,0,300
+400,260.05,1989.02,1484.88,0.000000,2800,400
+# livros_ao_final=206420 (semente=200000)
+# fim motivo=descartadas

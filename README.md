@@ -18,6 +18,11 @@ scripts/verify-queries.sh             critério de aceite 8.2 — equivalência 
 scripts/collect-versions.sh           registro das versões exatas para o Apêndice
 scripts/count-sloc.sh                 métrica de produtividade (seção 7) — SLOC-A e SLOC-B
 scripts/verify-warmup.sh              critério de aceite 8.3 — estabilidade sob aquecimento
+scripts/run-capacity.sh               teste de capacidade — patamares de taxa de chegada
+scripts/common.sh                     rotinas comuns do protocolo de coleta
+scripts/analyze-capacity.py           curva latência × taxa, capacidade e C_min
+scripts/analyze-experiment.py         médias com IC 95%, CV e diferenças entre frameworks
+scripts/stats_util.py                 t de Student e Welch, sem dependências externas
 scripts/analyze-warmup.py             análise das séries do critério 8.3
 scripts/k6-run.sh                     executa o k6 em contêiner, na rede dos serviços
 scripts/run-experiment.sh             campanha completa de um framework
@@ -43,7 +48,7 @@ k6 run -e BASE_URL=http://localhost:8080 -e FW=springboot k6/contract-test.js
 ./scripts/compare-fingerprints.sh   # roda os cinco e confronta os fingerprints
 
 # 4. campanha: 3 níveis de carga x 10 repetições
-./scripts/run-experiment.sh springboot
+RATES="..." DURATION=300s ./scripts/run-experiment.sh
 ```
 
 O passo 3 é o que sustenta, perante a banca, a afirmação de que a especificação funcional

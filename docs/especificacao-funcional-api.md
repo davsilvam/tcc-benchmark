@@ -457,17 +457,59 @@ forma divergente e é tratada como defeito de implementação.
 
 ### 8.3 Estabilidade sob aquecimento
 
-Execução preliminar de 60 segundos no nível de carga intermediário, verificando que a
-latência média se estabiliza e que a taxa de erro é nula. Frameworks com compilação em
-tempo de execução que não estabilizem em 60 segundos exigem revisão do período de
-aquecimento definido na seção 3.4 — para todos, e não apenas para o caso divergente.
+Execução preliminar no nível de carga intermediário do teste de carga fixa, verificando que
+a latência média se estabiliza e que a taxa de erro é nula.
+
+**Período de aquecimento: 150 segundos**, e não os 60 segundos originalmente previstos. O
+estudo-piloto mediu o Spring Boot entrando em regime apenas aos 90 segundos, e aos 60
+segundos ainda 35% acima do patamar estável; medir ali incluiria a cauda da compilação em
+tempo de execução na janela de medição, e apenas nos dois tratamentos que a possuem. O
+período é o mesmo para os cinco: a revisão vale para todos, e não apenas para o caso
+divergente.
+
+A estabilização é avaliada por `scripts/verify-warmup.sh`, que executa a carga por período
+maior que o aquecimento e registra a latência média em intervalos de 10 segundos. Duas
+leituras são reportadas por `scripts/analyze-warmup.py`:
+
+- a entrada em regime, definida como o primeiro intervalo cuja média cai dentro de ±10% do
+  regime estável, acompanhada da dispersão observada depois desse ponto;
+- o critério de Georges, Buytaert e Eeckhout (2007): o primeiro instante a partir do qual o
+  coeficiente de variação da latência média, sobre uma janela de *k* intervalos consecutivos,
+  fica abaixo de 2%.
+
+> **Verificação pendente.** Os 150 segundos foram estabelecidos sob o modelo FECHADO de
+> geração de carga, com número fixo de usuários virtuais. Com a adoção do modelo aberto
+> (seção 9), o aquecimento precisa ser reconfirmado sob taxa de chegada fixa, no nível
+> intermediário do teste de carga fixa.
 
 ---
 
 ## 9. Perfil de carga
 
-Distribuição de operações por iteração de usuário virtual, correspondente ao mix de
-70% de leitura e 30% de escrita:
+### 9.1 Modelo de geração de carga
+
+**Modelo aberto.** As requisições chegam segundo uma taxa configurada, independentemente da
+conclusão das anteriores — executor `constant-arrival-rate` do k6. Cada iteração do script
+emite exatamente uma requisição, de modo que a taxa de iterações é a taxa de requisições por
+segundo.
+
+A escolha determina o que se pode comparar. No modelo fechado, a carga efetivamente imposta
+não é fixada pelo experimentador: resulta do número de usuários e do próprio tempo de
+resposta do sistema. Cada framework receberia, então, uma demanda diferente — o mais rápido
+completaria mais requisições e consumiria mais recursos —, e a comparação do consumo de CPU
+e de memória perderia sentido.
+
+**Usuários virtuais no modelo aberto.** Eles não definem a carga: são o reservatório do qual
+o gerador retira um para cada chegada. O teto é o mesmo para os cinco tratamentos —
+`maxVUs = max(200, taxa)`, isto é, um segundo de fila à taxa configurada — e é integralmente
+pré-alocado antes do início. A pré-alocação total não é detalhe: com poucos usuários
+pré-alocados, o k6 aloca os que faltam durante o teste e descarta as chegadas que ocorrem
+enquanto aloca, de modo que a métrica `dropped_iterations` passaria a medir a velocidade de
+alocação do gerador em vez do limite do sistema sob teste.
+
+### 9.2 Distribuição de operações
+
+Distribuição por requisição, correspondente ao mix de 70% de leitura e 30% de escrita:
 
 | Operação | Proporção |
 |---|---|
@@ -477,23 +519,49 @@ Distribuição de operações por iteração de usuário virtual, correspondente
 | `POST /api/books` | 20% |
 | `PUT /api/books/{id}` | 10% |
 
-**Sequência determinística.** O script k6 seleciona a operação e seus parâmetros por meio de
-um gerador congruente linear com semente derivada do identificador do usuário virtual e do
-número da repetição. Consequentemente, a repetição *n* aplica exatamente a mesma sequência
-de requisições, com os mesmos identificadores e os mesmos prefixos de busca, aos cinco
-frameworks. Sem essa precaução, cada framework receberia um sorteio distinto de
-identificadores, e parte da variação observada decorreria da carga e não da tecnologia.
+### 9.3 Sequência determinística
 
-**Restauração do estado do banco.** Como 30% das operações alteram a base, o volume de
+O script k6 seleciona a operação e seus parâmetros por meio de um gerador congruente linear
+(MINSTD) semeado, a cada iteração, pelo **número global da iteração no teste**
+(`exec.scenario.iterationInTest`), pelo número da repetição e pela fase da execução. A
+repetição *n* aplica, assim, exatamente a mesma sequência de requisições, com os mesmos
+identificadores e os mesmos prefixos de busca, aos cinco frameworks. Sem essa precaução, cada
+framework receberia um sorteio distinto, e parte da variação observada decorreria da carga e
+não da tecnologia.
+
+A semente vem da iteração, e não do usuário virtual, por exigência do modelo aberto: a
+atribuição de iterações a usuários virtuais depende de quais estavam livres em cada instante,
+o que depende do tempo de resposta do framework — semear pelo usuário virtual daria a cada
+tratamento uma sequência diferente.
+
+Duas particularidades da implementação:
+
+- **A semente passa por uma função de mistura não linear antes de alimentar o gerador.** Num
+  gerador congruente linear, sementes consecutivas produzem primeiras saídas em progressão
+  aritmética, e a operação sorteada seguiria um padrão periódico. Verificado sobre 200 mil
+  iterações: com semeadura linear, apenas 12,4% das iterações consecutivas repetem a
+  operação, contra os 26% esperados de sorteio independente; com a mistura, 26,1%, e a
+  distribuição observada é 40,1 / 20,0 / 10,0 / 20,0 / 10,0.
+- **A fase entra na semente.** Aquecimento e medição executam sobre a mesma base. Se
+  aplicassem a mesma sequência, cada `PUT` da medição regravaria no mesmo livro os valores já
+  gravados no aquecimento; Hibernate e EF Core detectam que nada mudou e suprimem o `UPDATE`,
+  enquanto Django e Eloquent o emitem sempre — uma assimetria de uma contra duas instruções
+  SQL em 10% das requisições, e apenas em dois tratamentos.
+
+### 9.4 Restauração do estado do banco
+
+Como 30% das operações alteram a base, o volume de
 `books` cresce ao longo de cada execução, e o custo de inserção e de manutenção de índice não
 é o mesmo na primeira e na centésima quinquagésima execução. Antes de **cada** repetição, a
 base é restaurada ao estado semente pelo procedimento de `infra/reset-db.sh`
 (`TRUNCATE` seguido de recarga a partir dos scripts, com reinício das sequências). O
 procedimento consta da seção 3.4 da monografia como etapa do protocolo de coleta.
 
-Os ISBN gerados pelas operações de escrita iniciam com o dígito `9`, faixa disjunta da
-utilizada pelos dados semente (que iniciam com `0`), eliminando colisões de chave única
-durante a execução.
+Os ISBN gerados pelas operações de escrita têm a forma `9` + fase (2 dígitos) + número
+global da iteração (10 dígitos). O dígito inicial `9` os separa dos dados semente, que
+iniciam com `0`. Os dois dígitos de fase separam as invocações do k6 que compartilham a mesma
+base — aquecimento e medição, ou os patamares do teste de capacidade —, porque cada invocação
+reinicia a numeração das iterações em zero e, sem eles, a chave única colidiria.
 
 ---
 

@@ -17,12 +17,54 @@ do host — reprova uma série que já entrou em regime há muito tempo. O que s
 
 O regime estável é a média dos últimos 30% dos intervalos.
 """
+import sys
+
+# O console do Windows usa cp1252 e falha ao imprimir os símbolos matemáticos do relatório.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import glob
 import io
 import json
 import sys
 
 TOL = 0.10
+
+
+CV_MAX = 0.02
+# k = 10 e o limiar de 2% são os de Georges, Buytaert e Eeckhout (2007): a seção 4.2
+# define o regime pelo CoV de k iterações abaixo de "0.01 or 0.02", e a avaliação deles
+# retém k = 10 com CoV < 0,02. As janelas menores ficam para comparação — com k = 10 e
+# intervalos de 10 s, o critério não consegue apontar regime antes dos 90 s, por
+# construção da janela, e convém ver o que janelas curtas dizem no mesmo dado.
+JANELAS = (3, 5, 6, 10)
+
+
+def coef_var(valores):
+    n = len(valores)
+    if n < 2:
+        return float('inf')
+    media = sum(valores) / n
+    if media == 0:
+        return float('inf')
+    dp = (sum((v - media) ** 2 for v in valores) / (n - 1)) ** 0.5
+    return dp / media
+
+
+def janela_estavel(lat, k, passo):
+    """Primeiro instante (s) a partir do qual o CV de k intervalos fica abaixo de CV_MAX,
+    e a fração de janelas subsequentes que também ficam."""
+    if len(lat) < k:
+        return {'inicio': None, 'fracao': 0.0}
+    cvs = [coef_var(lat[i:i + k]) for i in range(len(lat) - k + 1)]
+    inicio = next((i for i, c in enumerate(cvs) if c < CV_MAX), None)
+    if inicio is None:
+        return {'inicio': None, 'fracao': 0.0}
+    posteriores = cvs[inicio:]
+    return {
+        'inicio': (inicio + k - 1) * passo,
+        'fracao': sum(1 for c in posteriores if c < CV_MAX) / len(posteriores),
+    }
+
 
 
 def analisar(caminho):
@@ -52,7 +94,16 @@ def analisar(caminho):
         # excesso acumulado antes da entrada, em segundos-equivalentes de latência
         custo = sum(max(0.0, v - estavel) for v in lat[:entrada]) / estavel * passo
 
+    # Critério de Georges, Buytaert e Eeckhout (2007): considera-se atingido o regime
+    # estável quando o coeficiente de variação da latência média, sobre uma janela de k
+    # intervalos consecutivos, cai abaixo de CV_MAX. O k não é escolhido aqui: o resultado
+    # é dado para vários valores, e a escolha fica registrada na monografia.
+    cv_janela = {}
+    for k in JANELAS:
+        cv_janela[k] = janela_estavel(lat, k, passo)
+
     return {
+        'cvJanela': cv_janela,
         'framework': caminho.replace('\\', '/').split('/')[-1].replace('.json', ''),
         'passo': passo,
         'primeiro': lat[0],
@@ -103,6 +154,20 @@ def main(padroes):
               % ', '.join(ruidosos))
     com_erro = [a['framework'] for a in linhas if a['erro'] > 0]
     print('Taxa de erro nula em todos: %s' % ('NÃO — ' + ', '.join(com_erro) if com_erro else 'SIM'))
+
+    print()
+    print('Regime estável pelo critério do coeficiente de variação (CV < %.0f%% numa janela'
+          % (CV_MAX * 100))
+    print('de k intervalos de %d s) — Georges, Buytaert e Eeckhout (2007):' % linhas[0]['passo'])
+    print('%-12s ' % 'framework' + '  '.join('k=%-22d' % k for k in JANELAS))
+    for a in linhas:
+        celulas = []
+        for k in JANELAS:
+            j = a['cvJanela'][k]
+            celulas.append('%-24s' % (
+                'não atingido' if j['inicio'] is None
+                else '%d s (%.0f%% das janelas)' % (j['inicio'], j['fracao'] * 100)))
+        print('%-12s ' % a['framework'] + '  '.join(celulas))
 
     print()
     for a in linhas:

@@ -440,7 +440,13 @@ adotado. Ver a justificativa na seção 4.4.
 **3. Pendência 3 da seção 10 da especificação — resolvida.** Escopo definido: o Apêndice
 reproduz as seções 2 a 6, 8 e 9 da especificação funcional.
 
-**4. A campanha.** 5 frameworks × 3 níveis × 10 repetições. O ensaio mediu 1.259 req/s a
+**4. A campanha, no modelo aberto.** A revisão metodológica de 22/09/2026 substituiu o
+modelo fechado pelo aberto e dividiu a medição em teste de capacidade e teste de carga fixa;
+o aparato já está adaptado (seção 10). A sequência passa a ser: teste de capacidade para
+obter C_min e os três níveis, reconfirmação do aquecimento sob taxa de chegada, piloto de
+variabilidade para dimensionar as repetições, e só então a campanha.
+
+**5. A campanha (estimativa anterior, do modelo fechado).** 5 frameworks × 3 níveis × 10 repetições. O ensaio mediu 1.259 req/s a
 50 VUs em 30 s no ASP.NET Core; cada repetição de medição são ~8,5 min (150 s de aquecimento +
 300 s de medição + restauração e recriação do contêiner), o que dá **~4,3 h por framework**
 e ~21 h no total.
@@ -745,3 +751,241 @@ frameworks.
 
 **Efeito das correções:** Django saiu de 65,4% para **0%** de erro, e os cinco passaram a
 apresentar taxa de erro nula.
+
+---
+
+## 10. Modelo aberto de carga — mudanças no aparato (22/09/2026)
+
+A revisão metodológica de 22/09/2026 substituiu o modelo fechado de geração de carga
+(número fixo de usuários virtuais) pelo modelo aberto (taxa de chegada fixa) e dividiu a
+medição em dois testes: o de capacidade e o de carga fixa. Esta seção registra o que mudou
+no aparato, o que foi verificado e o que ainda depende do estudo-piloto.
+
+### 10.1 O que mudou
+
+| Antes | Agora |
+|---|---|
+| `constant-vus`, níveis de 50/100/200 usuários | `constant-arrival-rate`, taxas derivadas de C_min |
+| semente do gerador: usuário virtual e repetição | semente: iteração global, repetição e fase |
+| um único script de campanha, por framework | teste de capacidade + teste de carga fixa |
+| campanha em blocos, um framework por vez | rodadas intercaladas, ordem sorteada por rodada |
+| sem análise estatística | IC 95% por t de Student, diferenças por Welch, CV e dimensionamento |
+
+Scripts novos ou reescritos:
+
+| Arquivo | Papel |
+|---|---|
+| `scripts/common.sh` | rotinas comuns: restauração, ciclo do contêiner, prontidão, `docker stats` |
+| `scripts/run-capacity.sh` | teste de capacidade, em patamares; subida em dois estágios na mesma sessão, repetições intercaladas e ordem sorteada |
+| `scripts/run-experiment.sh` | teste de carga fixa, rodadas intercaladas, com retomada |
+| `scripts/verify-warmup.sh` | critério 8.3 sob taxa de chegada |
+| `scripts/analyze-capacity.py` | curva latência × taxa; capacidade utilizável pelo último patamar antes da 1ª violação, resumida por moda/mediana; C_min e os três níveis |
+
+| `scripts/analyze-experiment.py` | médias com IC, CV, dimensionamento, diferenças de Welch |
+| `scripts/analyze-warmup.py` | entrada em regime e critério do coeficiente de variação |
+| `scripts/stats_util.py` | t de Student e Welch, sem dependências externas |
+
+### 10.2 Decisões de implementação
+
+**Patamares como invocações separadas, e não `ramping-arrival-rate`.** O critério (iii) da
+capacidade utilizável exige `dropped_iterations` **por patamar**, e o k6 só reporta essa
+métrica como total do teste. Com uma invocação de `constant-arrival-rate` por patamar, cada
+resumo traz a sua. O custo é um intervalo de cerca de 1 s entre patamares, enquanto o k6
+inicia. Se a monografia nomear o executor, é `constant-arrival-rate` encadeado.
+
+**Todo o teto de usuários virtuais é pré-alocado.** Com poucos pré-alocados, o k6 aloca os
+que faltam durante o teste e descarta as chegadas que ocorrem enquanto aloca. Medido: a
+50 req/s com 20 pré-alocados, 28 iterações descartadas usando apenas 48 dos 200 disponíveis
+— o critério (iii) estaria medindo a velocidade de alocação do gerador. Com pré-alocação
+total, o descarte significa o que a definição pretende: o sistema sob teste manteve em
+andamento mais requisições do que a taxa de um segundo. Custo verificado: 1.500 usuários
+ocupam 285 MiB no contêiner do k6.
+
+**A semente do gerador passa por uma função de mistura não linear.** Verificado sobre 200
+mil iterações: com semeadura linear, apenas 12,4% das iterações consecutivas repetem a
+operação, contra os 26% esperados de sorteio independente — um padrão periódico. Com a
+mistura, 26,1%, e a distribuição observada é 40,1 / 20,0 / 10,0 / 20,0 / 10,0.
+
+**A fase entra na semente.** Corrige uma assimetria que já existia no modelo fechado e
+passara despercebida: aquecimento e medição usavam a mesma semente e, portanto, a mesma
+sequência. Cada `PUT` da medição regravava no mesmo livro os valores já gravados no
+aquecimento; Hibernate e EF Core suprimem o `UPDATE` quando nada muda, enquanto Django e
+Eloquent o emitem sempre — uma instrução SQL contra duas, em 10% das requisições, e apenas
+em dois dos cinco tratamentos.
+
+### 10.3 Defeitos corrigidos no protocolo
+
+**O `run-experiment.sh` recriava o PostgreSQL a cada execução.** O comando era
+`up -d --force-recreate` **sem o nome do serviço**; sob um profile, isso recria todos os
+serviços ativos, e o `postgres` não tem profile. Verificado por comparação do instante de
+partida do contêiner: com o nome do serviço, preservado; sem ele, recriado. A base era
+destruída e recarregada pelo `initdb` a cada execução, e o SGBD reiniciado entre medições —
+o oposto do que a seção 3.4 exige.
+
+**O `reset-db.sh` falhava em silêncio.** O `psql` prossegue após erro e termina com código
+zero. Observado: uma restauração deixou 642 linhas residuais, que produziram colisões de
+ISBN e 4% de erro na medição seguinte, sem nenhum aviso. Agora usa `ON_ERROR_STOP=1` e
+confere que a base terminou com exatamente 1.000 autores e 200.000 livros.
+
+**Uma campanha podia rodar contra um banco ausente.** Duas decisões corretas em si se
+combinavam mal: `--no-deps` evita recriar o PostgreSQL, mas também não o inicia se estiver
+parado; e `/api/health` não toca o banco (seção 4.6), de modo que a aplicação responde "UP"
+com o banco morto. Ocorreu de fato, depois de a máquina suspender. Agora há a pré-condição
+`require_postgres`, que recusa iniciar qualquer medição sem o banco aceitando conexões.
+
+### 10.4 Medido, disponível para o texto
+
+- **Intervalo efetivo de amostragem do `docker stats`: 2,10 s em média** (mín 2,01, máx
+  2,37). Não é 1 s: cada amostra exige duas leituras do daemon, e o intervalo é medido pelos
+  carimbos de tempo do próprio arquivo, não suposto. `analyze-experiment.py` o recalcula a
+  cada análise.
+- **Docker Desktop 4.90.0, engine 29.7.2** — confere com o texto da versão 1.1.
+- A taxa obtida acompanha a configurada com precisão: 60,0 req/s medidos contra 60
+  configurados, com CV de 0,0% entre execuções.
+
+### 10.5 Pendente do estudo-piloto
+
+Nenhum destes valores foi arbitrado pelo aparato; todos dependem de medição:
+
+| Símbolo no texto | O que é | Como obter |
+|---|---|---|
+| [X] | teto do p95 na definição de capacidade | `analyze-capacity.py` reporta a latência de base e as taxas em que o p95 a supera em 2, 3 e 5 vezes |
+| [Y], [Z] | incremento e duração do patamar | parâmetros `STEP` e `STEP_S` de `run-capacity.sh` |
+| [N_A] | repetições do teste de capacidade | parâmetro `REPS` |
+| [C_min] | menor capacidade entre os cinco | `analyze-capacity.py --p95-max X` |
+| [D] | duração da medição | parâmetro `DURATION` de `run-experiment.sh` |
+| [CV], [H] | variabilidade entre execuções e precisão projetada | `analyze-experiment.py` sobre ao menos 5 execuções-piloto por framework |
+| [k] | janela do critério de coeficiente de variação | `analyze-warmup.py` reporta k = 3, 5 e 6 |
+
+> **Sinal de alerta sobre [k].** Nas séries do modelo fechado, a 100 usuários virtuais, o
+> critério de CV abaixo de 2% **não é atingido** por ASP.NET Core, Laravel e Spring Boot com
+> janela de 5 ou 6 intervalos; mesmo com janela de 3, apenas 12% a 48% das janelas o
+> satisfazem. Aquelas séries estavam em saturação, e sob taxa de chegada bem abaixo da
+> capacidade a dispersão tende a ser menor — mas convém confirmar antes de fixar o limiar de
+> 2%, sob pena de nenhum k servir.
+
+---
+
+## 11. Estudo-piloto de capacidade (25/09/2026)
+
+Subida em patamares de 100 req/s, cada um mantido por 20 s, de 100 até a primeira violação.
+Aquecimento de 150 s a 100 req/s antes do primeiro patamar; base restaurada e contêiner
+recriado antes de cada framework. Reprodução:
+
+```bash
+# FINE_STEP=100 (= STEP) desliga o estagio fino, acrescentado ao script em 25/09/2026.
+# Sem ele o padrao passa a ser STEP/4 e a execucao NAO reproduz o piloto como foi medido.
+START=100 STEP=100 FINE_STEP=100 STEP_S=20 MAX_RATE=3000 P95_SAFETY=2000 \
+  OUT=results/capacity-piloto ./scripts/run-capacity.sh
+python scripts/analyze-capacity.py --dir results/capacity-piloto --p95-max <X>
+```
+
+### 11.1 Curvas latência × taxa
+
+p95 em ms, por patamar (req/s):
+
+| Framework | Curva | Último sustentado | Primeiro insustentável |
+|---|---|---:|---|
+| Laravel | 100:11 200:7 | **300** (ver 11.4) | 400: obtida 260, p95 1.989 ms |
+| Django | 100:7 … 700:8 800:23 | **800** | 900: obtida 804, p95 1.437 ms |
+| Spring Boot | 100:7 … 1400:6 | **1.400** | 1.500: obtida 771, p95 2.844 ms |
+| NestJS | 100:6 … 1000:8 1100:9 1200:11 1300:14 1400:55 1500:38 1600:308 1700:967 | **1.300 a 1.700** | 1.800: obtida 1.722, p95 1.676 ms |
+| ASP.NET Core | 100:8 … 1600:6 1700:19 1800:6 | **1.800** | 1.900: obtida 1.871, p95 1.059 ms |
+
+**Quatro dos cinco não têm joelho.** A latência permanece plana — entre 4 e 11 ms — ao longo
+de toda a faixa sustentável e salta duas a três ordens de grandeza no primeiro patamar
+insustentável, sem degradação gradual. O NestJS é a exceção: degrada progressivamente a
+partir de 1.100 req/s.
+
+### 11.2 Sensibilidade da capacidade ao teto [X]
+
+Capacidade utilizável (req/s) calculada sobre as mesmas curvas, variando apenas [X]:
+
+| Framework | 20 ms | 30 ms | 50 ms | 100 ms | 500 ms | 1.000 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Laravel | 200 | 200 | 200 | 200 | 200 | 200 |
+| Django | 700 | 800 | 800 | 800 | 800 | 800 |
+| Spring Boot | 1.400 | 1.400 | 1.400 | 1.400 | 1.400 | 1.400 |
+| **NestJS** | **1.300** | **1.300** | **1.500** | **1.500** | **1.600** | **1.700** |
+| ASP.NET Core | 1.800 | 1.800 | 1.800 | 1.800 | 1.800 | 1.800 |
+
+(valores do Laravel conforme a varredura original; ver 11.4)
+
+Duas consequências para a seção 3.4.2 da monografia:
+
+**A derivação de [X] "do joelho da curva" não se sustenta para quatro dos cinco.** Não há
+joelho: a transição é abrupta. A opção (a) prevista no texto só teria referência empírica no
+NestJS.
+
+**O teto não é indiferente ao ordenamento.** Com [X] ≤ 30 ms, o Spring Boot supera o NestJS
+em capacidade; com [X] ≥ 50 ms, a posição inverte. Como a capacidade utilizável é critério
+HB da dimensão de desempenho, a escolha de [X] altera o resultado do SAW. Convém, portanto,
+que [X] seja fixado por um critério declarado e anterior à observação — um limite de
+responsividade da literatura, por exemplo —, e que a análise de sensibilidade da seção 3.5.4
+inclua [X] entre os eixos examinados.
+
+### 11.3 O caso do Laravel e a necessidade de [N_A] > 1
+
+Na varredura completa, o Laravel — quarto framework da sequência, após cerca de 40 minutos de
+carga contínua na máquina — colapsou em 300 req/s, indicando capacidade de 200. Repetida a
+subida três vezes em sessão dedicada, ele sustentou **300 req/s em todas as três repetições**,
+com p95 entre 8,7 e 10,0 ms, colapsando apenas em 400:
+
+| Repetição | 100 | 200 | 300 | 400 |
+|---|---:|---:|---:|---|
+| rep01 | 9,5 | 8,8 | 9,4 | colapso (260 obtidas, 2.800 descartes) |
+| rep02 | 9,3 | 8,5 | 10,0 | colapso (234 obtidas, 3.324 descartes) |
+| rep03 | 9,9 | 9,9 | 8,7 | colapso (263 obtidas, 2.748 descartes) |
+
+Medição isolada de CPU confirma que 300 req/s não satura o contêiner: 112% de utilização
+média dos 200% disponíveis, com p95 de 10,4 ms e nenhum descarte.
+
+**Ruído de fundo conhecido nestas três repetições.** Três laços coletores de `docker stats`
+ficaram órfãos às 13:20:58 de 25/09/2026 e só foram encerrados horas depois; as repetições
+dedicadas do Laravel (13:27:20 a 13:39:35) e a medição isolada de CPU correram inteiras
+dentro dessa janela. A varredura dos cinco frameworks, encerrada às 13:16:54, é anterior e
+não foi afetada. O viés é unidirecional — carga adicional na máquina —, de modo que os
+300 req/s sustentados em 3/3 e a folga de CPU são estimativas conservadoras: os p95 de 8,7
+a 10,0 ms e os 112% de utilização são limites superiores do que ocorreria sem o ruído. As
+conclusões abaixo não dependem da magnitude exata desses valores.
+
+Duas conclusões:
+
+- **[N_A] = 1 é insuficiente.** A diferença entre 200 e 300 req/s é de 50% e propaga-se a
+  todos os níveis da campanha, já que o Laravel define o C_min.
+- **O efeito de posição na sessão, descrito na seção 3.6.1, é mensurável no teste de
+  capacidade.** O argumento que justifica intercalar os tratamentos no teste de carga fixa
+  (seção 3.4.4) aplica-se igualmente aqui. **Já aplicado:** desde 25/09/2026 o
+  `scripts/run-capacity.sh` intercala as repetições e sorteia a ordem de cada rodada, com
+  semente `ORDER_SEED` própria, distinta da do `run-experiment.sh` — se fossem iguais, a
+  rodada *n* dos dois testes usaria a mesma ordem e um eventual efeito de posição se
+  alinharia entre eles em vez de se distribuir. A ordem usada fica em `ordem.csv`. Os números
+  desta seção 11, porém, foram obtidos **antes** da mudança, percorrendo os frameworks em
+  bloco, e é isso que explica o caso do Laravel.
+
+### 11.4 Valores provisórios
+
+| Símbolo | Valor | Situação |
+|---|---|---|
+| [Y] grosso | 100 req/s | passo do estágio grosso; localiza o intervalo |
+| [Y] fino | 25 req/s | passo do estágio fino; **é ele que fixa a resolução, ±12,5 req/s**. Precisa dividir o passo grosso, ou a resolução declarada exclui o valor verdadeiro — o script recusa a execução se não dividir |
+| [Z] | 20 s | suficiente: a taxa obtida igualou a configurada em todos os patamares sustentáveis |
+| [N_A] | ≥ 3 | 1 demonstradamente insuficiente (11.3) |
+| [C_min] | 300 req/s (Laravel) | provisório: só o Laravel foi repetido |
+| níveis | 75 / 150 / 225 req/s | decorrem de C_min = 300 |
+| [X] | — | decisão pendente (11.2) |
+
+Com C_min = 300 req/s, os demais tratamentos serão medidos entre 4% e 75% de sua capacidade:
+o Laravel a 25–75%, o Django a 9–28%, o Spring Boot a 5–16%, o NestJS a 4–17% e o ASP.NET
+Core a 4–12%. É consequência direta da restrição à menor capacidade, adotada deliberadamente
+na seção 3.4.3, e convém registrar que a comparação de consumo de recursos ocorre, para
+quatro dos cinco, em regime de baixa utilização.
+
+### 11.5 Crescimento da base durante a subida
+
+A base não é restaurada entre patamares e 20% das requisições são inserções. Volume final
+por execução, contra os 200.000 da semente: Laravel 204.955; Django 220.641; Spring Boot
+248.170; NestJS 271.279; ASP.NET Core 279.129. O crescimento acompanha a vazão acumulada e
+concentra-se nos patamares altos. Como a latência permanece plana até o colapso, não há
+indício de que tenha influenciado as curvas; o registro fica para que a afirmação seja
+verificável.
