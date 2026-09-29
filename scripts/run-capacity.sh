@@ -105,6 +105,20 @@ MAX_SEGMENT=99
 MAX_STEPS=90
 
 mkdir -p "$OUT"
+# O k6 roda em conteiner com apenas $ROOT montado em /work (ver scripts/k6-run.sh) e escreve
+# o RESULT_FILE de dentro dele. Um OUT fora do repositorio nao existe no conteiner: o k6 falha
+# ao gravar o resumo, todo patamar volta como k6_sem_resultado e a execucao inteira se perde.
+# Verificar aqui custa nada e evita descobrir isso depois de cinco frameworks.
+OUT_ABS="$(cd "$OUT" && pwd)"
+case "$OUT_ABS/" in
+  "$ROOT"/*) : ;;
+  *)
+    echo "erro: OUT=$OUT resolve para $OUT_ABS, fora de $ROOT." >&2
+    echo "       O k6 e conteinerizado e so ve o repositorio; use um caminho interno," >&2
+    echo "       por exemplo OUT=results/capacity." >&2
+    exit 1
+    ;;
+esac
 [ -f "$OUT/ordem.csv" ] || echo "repeticao,posicao,framework" > "$OUT/ordem.csv"
 {
   echo "iniciado_em=$(date -Is)"
@@ -166,6 +180,11 @@ medir_patamar() {
   echo "$dados" | awk -F, -v e="$estagio" '{printf "  %5d req/s  obtida=%.0f  p95=%.1f ms  erro=%.2f%%  descartadas=%-5s %s\n", $1, $2, $3, $5*100, $6, e}'
 }
 
+# Execucoes que terminaram sem medicao valida. Nao sao resultado: sao falha, e o script
+# precisa dizer isso no codigo de saida, porque um "concluido" com codigo 0 sobre cinco
+# execucoes vazias e indistinguivel de um experimento bem-sucedido.
+falhas=()
+
 for rep in $(seq 1 "$REPS"); do
   read -r -a ORDER <<< "$(shuffle "$((ORDER_SEED * 1000 + rep))" "${FRAMEWORKS[@]}")"
   if ! grep -q "^$rep," "$OUT/ordem.csv"; then
@@ -177,7 +196,7 @@ for rep in $(seq 1 "$REPS"); do
   for fw in "${ORDER[@]}"; do
     tag="${fw}_rep$(printf '%02d' "$rep")"
     csv="$OUT/$tag.csv"
-    if [ -s "$csv" ] && grep -q '^# fim' "$csv"; then
+    if [ -s "$csv" ] && grep -q '^# fim' "$csv" && ! grep -q 'SEM MEDICAO' "$csv"; then
       echo "=== $tag — já medido, pulando"
       continue
     fi
@@ -186,7 +205,11 @@ for rep in $(seq 1 "$REPS"); do
 
     reset_db
     app_up "$fw"
-    if ! wait_health "$fw"; then app_down "$fw"; continue; fi
+    if ! wait_health "$fw"; then
+      app_down "$fw"
+      falhas+=("$tag: aplicação não ficou pronta")
+      continue
+    fi
 
     k6_run -q -e BASE_URL="$(service_url "$fw")" -e RATE="$START" \
       -e DURATION="$WARMUP_DURATION" -e WARMUP=1 -e RUN_ID="$rep" k6/load-test.js
@@ -239,7 +262,14 @@ for rep in $(seq 1 "$REPS"); do
     # awk, e nao $((FINE_STEP / 2)): a divisao inteira do shell registraria +-12 para um
     # passo fino de 25, e a resolucao declarada na metodologia e +-FINE_STEP/2 = +-12,5.
     resolucao="$(awk -v f="$FINE_STEP" 'BEGIN { printf "%.1f", f / 2 }')"
-    if [ "$ultimo_ok" -eq 0 ]; then
+    if [ "$motivo" = "k6_sem_resultado" ]; then
+      # O gerador nao produziu resumo: nada foi medido. Isso NAO e "capacidade abaixo de
+      # START" — as duas situacoes escreveriam a mesma linha, e so o motivo as separa. Sem a
+      # marca explicita, um log lido depois nao as distingue.
+      echo "# SEM MEDICAO — falha de instrumento, nenhum patamar avaliado" >> "$csv"
+      echo "  SEM MEDIÇÃO: o k6 não produziu resultado; nada foi medido" >&2
+      falhas+=("$tag: $motivo")
+    elif [ "$ultimo_ok" -eq 0 ]; then
       # Nem o primeiro patamar se sustentou: o que se sabe e que a capacidade fica abaixo de
       # START, e nao que seja zero. A resolucao do estagio fino nao se aplica, porque ele nao
       # correu — nao havia intervalo a refinar.
@@ -254,5 +284,13 @@ for rep in $(seq 1 "$REPS"); do
     app_down "$fw"
   done
 done
+
+if [ "${#falhas[@]}" -gt 0 ]; then
+  echo >&2
+  echo "FALHOU: ${#falhas[@]} execução(ões) sem medição válida, de $((${#FRAMEWORKS[@]} * REPS)):" >&2
+  for f in "${falhas[@]}"; do echo "  - $f" >&2; done
+  echo "Os CSVs correspondentes estão marcados com SEM MEDICAO e serão refeitos na retomada." >&2
+  exit 1
+fi
 
 echo "concluído: $OUT  (analisar com: python scripts/analyze-capacity.py)"

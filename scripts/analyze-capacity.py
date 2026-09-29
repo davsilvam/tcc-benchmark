@@ -165,6 +165,13 @@ def main():
     for fw, reps in sorted(por_fw.items()):
         valores = []
         for rep, pats, motivo, _ in reps:
+            # Execução sem medição válida não é dado. O run-capacity.sh marca o CSV, mas um
+            # arquivo truncado por outra razão também cai aqui: sem patamares não há o que
+            # resumir, e incluí-la como zero ou como "abaixo de START" inventaria resultado.
+            if not pats or motivo == 'k6_sem_resultado':
+                print('%-11s rep%02d  SEM MEDIÇÃO (%s) — excluída do resumo'
+                      % (fw, rep, motivo or 'nenhum patamar no arquivo'))
+                continue
             maior, ultimo = capacidade(pats, x)
             # A seção 3.4.2 define a capacidade como o ÚLTIMO patamar antes da primeira
             # violação, e não o maior que satisfaz: a varredura é cumulativa, de modo que a
