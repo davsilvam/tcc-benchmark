@@ -185,21 +185,28 @@ export default function () {
     );
   }
 
+  // O rótulo `name` é obrigatório aqui, e não cosmético. Sem ele o k6 usa a URL inteira como
+  // nome da série temporal, e as URLs de byId e de update carregam o id do livro: cada
+  // requisição criaria uma série distinta. A 1.200 req/s por 60 s isso dá cerca de 21.600 URLs
+  // únicas e, a nove métricas por conjunto de rótulos, mais de 200.000 séries — o k6 avisa
+  // acima de 100.000 porque o consumo de memória cresce, e ele roda na mesma máquina que o
+  // sistema sob teste. Pausas de coleta de lixo do próprio gerador entram na latência que ele
+  // reporta, o que é indistinguível de latência do framework.
   const draw = nextInt(100);
 
   if (draw < 40) {
     const page = nextInt(200);
-    const res = http.get(`${BASE}/api/books?page=${page}&size=20`, { tags: { endpoint: 'list' } });
+    const res = http.get(`${BASE}/api/books?page=${page}&size=20`, { tags: { endpoint: 'list', name: '/api/books?page&size' } });
     check(res, { 'list 200': (r) => r.status === 200 });
 
   } else if (draw < 60) {
     const id = 1 + nextInt(SEED_BOOKS);
-    const res = http.get(`${BASE}/api/books/${id}`, { tags: { endpoint: 'byId' } });
+    const res = http.get(`${BASE}/api/books/${id}`, { tags: { endpoint: 'byId', name: '/api/books/:id' } });
     check(res, { 'byId 200': (r) => r.status === 200 });
 
   } else if (draw < 70) {
     const title = WORDS[nextInt(WORDS.length)];
-    const res = http.get(`${BASE}/api/books/search?title=${title}&size=20`, { tags: { endpoint: 'search' } });
+    const res = http.get(`${BASE}/api/books/search?title=${title}&size=20`, { tags: { endpoint: 'search', name: '/api/books/search?title&size' } });
     check(res, { 'search 200': (r) => r.status === 200 });
 
   } else if (draw < 90) {
@@ -210,7 +217,7 @@ export default function () {
       publicationYear: 1450 + nextInt(576),
       price: money(),
     });
-    const res = http.post(`${BASE}/api/books`, body, { ...JSON_HEADERS, tags: { endpoint: 'create' } });
+    const res = http.post(`${BASE}/api/books`, body, { ...JSON_HEADERS, tags: { endpoint: 'create', name: '/api/books' } });
     check(res, { 'create 201': (r) => r.status === 201 });
 
   } else {
@@ -220,7 +227,7 @@ export default function () {
       publicationYear: 1450 + nextInt(576),
       price: money(),
     });
-    const res = http.put(`${BASE}/api/books/${id}`, body, { ...JSON_HEADERS, tags: { endpoint: 'update' } });
+    const res = http.put(`${BASE}/api/books/${id}`, body, { ...JSON_HEADERS, tags: { endpoint: 'update', name: '/api/books/:id' } });
     check(res, { 'update 200': (r) => r.status === 200 });
   }
 }
