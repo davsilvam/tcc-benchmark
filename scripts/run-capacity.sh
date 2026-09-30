@@ -201,6 +201,16 @@ for rep in $(seq 1 "$REPS"); do
       continue
     fi
     echo "=== $tag"
+
+    # O banco é verificado a cada célula, e não só no início do script. Se ele cair no meio
+    # de uma execução de horas, a aplicação passa a devolver erro e o k6 grava um resumo
+    # perfeitamente válido dizendo que 100% das requisições falharam. Sem esta verificação
+    # isso é lido como violação do critério (ii) e registrado como capacidade abaixo de START,
+    # que foi o que ocorreu em 30/09/2026 na primeira tentativa do NestJS com Z=60 s.
+    if ! require_postgres; then
+      falhas+=("$tag: banco indisponível antes da execução")
+      continue
+    fi
     echo "rate_target,achieved_rps,p95_ms,avg_ms,error_rate,dropped,vus_max_used,estagio" > "$csv"
 
     reset_db
@@ -262,7 +272,13 @@ for rep in $(seq 1 "$REPS"); do
     # awk, e nao $((FINE_STEP / 2)): a divisao inteira do shell registraria +-12 para um
     # passo fino de 25, e a resolucao declarada na metodologia e +-FINE_STEP/2 = +-12,5.
     resolucao="$(awk -v f="$FINE_STEP" 'BEGIN { printf "%.1f", f / 2 }')"
-    if [ "$motivo" = "k6_sem_resultado" ]; then
+    if [ -z "$livros" ]; then
+      # A contagem de livros falhou: o banco sumiu durante a execução. Tudo o que foi medido
+      # a partir daí é erro de ambiente, não comportamento do framework.
+      echo "# SEM MEDICAO — banco indisponível durante a execução" >> "$csv"
+      echo "  SEM MEDIÇÃO: o banco ficou indisponível durante a execução" >&2
+      falhas+=("$tag: banco caiu durante a execução")
+    elif [ "$motivo" = "k6_sem_resultado" ]; then
       # O gerador nao produziu resumo: nada foi medido. Isso NAO e "capacidade abaixo de
       # START" — as duas situacoes escreveriam a mesma linha, e so o motivo as separa. Sem a
       # marca explicita, um log lido depois nao as distingue.

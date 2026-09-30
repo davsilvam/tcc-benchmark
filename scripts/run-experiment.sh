@@ -92,10 +92,29 @@ for rep in $(seq 1 "$REPS"); do
       fi
       echo "  $tag"
 
+      # O banco é verificado a cada execução, e não só no início. Numa campanha de ~19 h,
+      # se ele cair no meio, a aplicação passa a devolver erro e o k6 grava um JSON
+      # perfeitamente válido com 100% de falhas — que a retomada consideraria concluído.
+      if ! require_postgres; then
+        echo "$tag,banco_indisponivel," >> "$OUT/invalidas.csv"
+        echo "    ATENÇÃO: banco indisponível; execução não realizada"
+        continue
+      fi
+
       reset_db
       app_up "$fw"
       if ! wait_health "$fw"; then
         app_down "$fw"
+
+      # Se o banco caiu durante a medição, o JSON existe e é sintaticamente válido, mas
+      # descreve o ambiente quebrado e não o framework. Removê-lo é o que faz a retomada
+      # refazer a execução, já que o teste de retomada é a existência do arquivo.
+      if ! require_postgres; then
+        rm -f "$result"
+        echo "$tag,banco_caiu_durante," >> "$OUT/invalidas.csv"
+        echo "    ATENÇÃO: o banco caiu durante a medição; resultado descartado"
+        continue
+      fi
         echo "$tag,falha_de_prontidao," >> "$OUT/invalidas.csv"
         continue
       fi
