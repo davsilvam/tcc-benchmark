@@ -31,27 +31,59 @@ OUT="${OUT:-results/warmup-aberto}"
 if [ "$#" -gt 0 ]; then FRAMEWORKS=("$@"); else FRAMEWORKS=("${ALL_FRAMEWORKS[@]}"); fi
 
 mkdir -p "$OUT"
+# O k6 roda em contêiner com apenas $ROOT montado em /work e grava o RESULT_FILE de
+# dentro dele; um OUT fora do repositório não existe lá, e a execução se perde em silêncio.
+OUT_ABS="$(cd "$OUT" && pwd)"
+case "$OUT_ABS/" in
+  "$ROOT"/*) : ;;
+  *)
+    echo "erro: OUT=$OUT resolve para $OUT_ABS, fora de $ROOT." >&2
+    echo "       O k6 é conteinerizado e só enxerga o repositório." >&2
+    exit 1
+    ;;
+esac
 echo "iniciado_em=$(date -Is) rate=$RATE duration=$DURATION bucket_s=$BUCKET_S" >> "$OUT/parametros.txt"
+
+# Execuções sem série gravada. Um aviso não basta: o script seguiria para a análise e
+# sairia com código 0, e uma reconfirmação de uma hora com frameworks faltando pareceria
+# bem-sucedida.
+falhas=()
 
 for fw in "${FRAMEWORKS[@]}"; do
   echo "=== $fw — $RATE req/s por $DURATION, intervalos de ${BUCKET_S}s ==="
 
   reset_db
   app_up "$fw"
-  if ! wait_health "$fw"; then app_down "$fw"; continue; fi
+  if ! wait_health "$fw"; then
+    app_down "$fw"
+    falhas+=("$fw: aplicação não ficou pronta")
+    continue
+  fi
 
   k6_run -q -e BASE_URL="$(service_url "$fw")" -e RATE="$RATE" -e DURATION="$DURATION" \
     -e BUCKET_S="$BUCKET_S" -e RUN_ID=1 -e RESULT_FILE="$OUT/$fw.json" k6/load-test.js \
-    >/dev/null 2>&1
+    >/dev/null 2>"$OUT/.$fw.err"
 
   app_down "$fw"
 
   if [ -s "$OUT/$fw.json" ]; then
     echo "  série gravada em $OUT/$fw.json"
+    rm -f "$OUT/.$fw.err"
   else
-    echo "  AVISO: sem série temporal — a execução do k6 falhou"
+    # O erro do k6 é mostrado, e não descartado: quando ele não consegue gravar o resumo,
+    # a mensagem dele é a única pista do motivo.
+    echo "  SEM SÉRIE — a execução do k6 falhou:" >&2
+    sed "s/^/    /" "$OUT/.$fw.err" >&2
+    falhas+=("$fw: k6 não gravou a série")
   fi
 done
+
+if [ "${#falhas[@]}" -gt 0 ]; then
+  echo >&2
+  echo "FALHOU: ${#falhas[@]} de ${#FRAMEWORKS[@]} execuções sem série:" >&2
+  for f in "${falhas[@]}"; do echo "  - $f" >&2; done
+  exit 1
+fi
 
 echo "=== análise ==="
 python scripts/analyze-warmup.py "$OUT/*.json"
