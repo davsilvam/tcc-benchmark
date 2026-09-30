@@ -106,7 +106,14 @@ def resumir_patamares(valores):
         contagem[x] = contagem.get(x, 0) + 1
     mais = max(contagem.values())
     modas = [x for x, c in contagem.items() if c == mais]
-    if mais > 1 and len(modas) == 1:
+    # A moda exige MAIORIA das repeticoes, nao apenas ser o valor mais frequente. Com
+    # N_A = 5 e resolucao de 25 req/s, um valor que aparece 2 vezes entre 5 quase nao e
+    # evidencia sobre os que aparecem 1 vez, e no teste formal de 30/09/2026 essa moda fraca
+    # caiu sobre o MAIOR valor observado do Laravel (350, numa faixa de 275 a 350) — o
+    # framework que define o C_min e, com ele, os tres niveis da campanha.
+    # mais >= 2 porque uma observacao unica satisfaz 'maioria' trivialmente e sairia
+    # rotulada como moda, o que e falso: com n = 1 nao ha valor mais frequente.
+    if mais >= 2 and mais * 2 > len(v) and len(modas) == 1:
         valor, criterio = modas[0], 'moda'
     else:
         valor, criterio = v[len(v) // 2], 'mediana'
@@ -201,7 +208,11 @@ def main():
         print()
         print('C_min = %d req/s (%s)' % (c_min, fw_min))
         for frac in (0.25, 0.50, 0.75):
-            print('  %2d%% de C_min = %.1f req/s' % (int(frac * 100), frac * c_min))
+            exato = frac * c_min
+            # O k6 le RATE com parseInt: a taxa tem de ser inteira. Arredonda-se para baixo,
+            # o que mantem o nivel do lado conservador do limite.
+            print('  %2d%% de C_min = %8.2f req/s  ->  usar RATE=%d' % (
+                int(frac * 100), exato, int(exato)))
 
 
 if __name__ == '__main__':

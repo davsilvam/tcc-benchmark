@@ -1,0 +1,8 @@
+commit=1c33acb089c6ccc910679087554e22fabdd8cb1f
+commit_curto=1c33acb
+arvore_limpa_fora_de_results=sim
+iniciado_em=2026-09-30T08:56:04-03:00
+start=100 step=100 fine_step=25 step_s=20 max_rate=3000
+p95_max=100 p95_safety=5000 reps=5
+order_seed=20260925
+warmup=150s@100rps frameworks=springboot django nestjs laravel aspnet

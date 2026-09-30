@@ -873,8 +873,8 @@ Aquecimento de 150 s a 100 req/s antes do primeiro patamar; base restaurada e co
 recriado antes de cada framework. Reprodução:
 
 ```bash
-# FINE_STEP=100 (= STEP) desliga o estagio fino, acrescentado ao script em 25/09/2026.
-# Sem ele o padrao passa a ser STEP/4 e a execucao NAO reproduz o piloto como foi medido.
+# FINE_STEP=100 (= STEP) desliga o estágio fino, acrescentado ao script em 25/09/2026.
+# Sem ele o padrão passa a ser STEP/4 e a execução NÃO reproduz o piloto como foi medido.
 START=100 STEP=100 FINE_STEP=100 STEP_S=20 MAX_RATE=3000 P95_SAFETY=2000 \
   OUT=results/capacity-piloto ./scripts/run-capacity.sh
 python scripts/analyze-capacity.py --dir results/capacity-piloto --p95-max <X>
@@ -989,3 +989,114 @@ por execução, contra os 200.000 da semente: Laravel 204.955; Django 220.641; S
 concentra-se nos patamares altos. Como a latência permanece plana até o colapso, não há
 indício de que tenha influenciado as curvas; o registro fica para que a afirmação seja
 verificável.
+
+---
+
+## 12. Teste de capacidade formal (30/09/2026)
+
+Cinco repetições por framework, intercaladas, com a ordem de cada rodada sorteada. Produzido
+pelo commit `1c33acb`, registrado em `results/capacity/parametros.txt`. Reprodução:
+
+```bash
+START=100 STEP=100 FINE_STEP=25 STEP_S=20 P95_MAX=100 MAX_RATE=3000 \
+  WARMUP_DURATION=150s REPS=5 OUT=results/capacity ./scripts/run-capacity.sh
+python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
+```
+
+As 25 execuções concluíram sem falha de instrumento, e o estágio fino correu em todas.
+Duração total de cerca de três horas.
+
+### 12.1 Resultado
+
+| Framework | Repetições (req/s) | Valor-resumo | Critério | CV |
+|---|---|---:|---|---:|
+| Laravel | 275 300 325 350 350 | **325** | mediana | 10,2% |
+| Django | 675 750 750 775 800 | **750** | mediana | 6,2% |
+| Spring Boot | 1375 1475 1550 1575 1675 | **1.550** | mediana | 7,3% |
+| NestJS | 1575 1575 1575 1575 1600 | **1.575** | moda (4/5) | **0,7%** |
+| ASP.NET Core | 1725 1875 1975 2025 2175 | **1.975** | mediana | 8,6% |
+
+**[C_min] = 325 req/s (Laravel).** Níveis do teste de carga fixa, arredondados para baixo
+porque o k6 lê `RATE` com `parseInt` e a taxa tem de ser inteira:
+
+| Nível | Exato | Taxa a usar |
+|---|---:|---:|
+| 25% | 81,25 req/s | **81** |
+| 50% | 162,50 req/s | **162** |
+| 75% | 243,75 req/s | **243** |
+
+O NestJS é a exceção em estabilidade: quatro repetições idênticas e CV de 0,7%, contra 6% a
+10% nos outros quatro. A dispersão dos demais confirma com folga que [N_A] = 1 era
+insuficiente, como a seção 11.3 já indicava.
+
+### 12.2 Por que a moda passou a exigir maioria
+
+A regra original — patamar mais frequentemente sustentado, ou a mediana na ausência de moda —
+produziu um resultado indesejado no único framework em que ele tem consequência. As cinco
+repetições do Laravel vão de 275 a 350, e o 350 aparece duas vezes: há moda, e ela é o **maior
+valor observado**. Como o Laravel define o C_min, esse valor fixaria os três níveis de toda a
+campanha.
+
+O risco é concreto porque a transição do Laravel é uma falésia, e não uma degradação: o p95
+fica entre 8,5 e 9,2 ms até a capacidade e salta para 2.000 a 2.900 ms no passo seguinte, de
+25 req/s, com milhares de iterações descartadas. O ponto da falésia varia por sessão — 375 nas
+repetições 1 e 2, 350 na 5, 325 na 3 e **300 na 4**.
+
+| [C_min] | Nível de 75% | Folga até a pior falésia (275) |
+|---|---:|---|
+| moda, 350 | 262,5 req/s | +12,5 req/s — **uma unidade de resolução** |
+| mediana, 325 | 243,8 req/s | +31,2 req/s — 2,5 unidades |
+| mínimo, 275 | 206,2 req/s | +68,8 req/s — 5,5 unidades |
+
+A seção 3.4.3 da monografia justifica a folga de 25% do nível superior como o que mantém a
+taxa abaixo da capacidade de todos os tratamentos. Essa folga foi concebida contra a diferença
+**entre** frameworks; a variância do Laravel consigo mesmo, de 27% entre sessões, consome 20
+dos 25 pontos.
+
+A causa é que, com [N_A] = 5 e resolução de 25 req/s, uma moda de 2 em 5 quase não é evidência
+sobre os valores que aparecem uma vez. **A regra passou a exigir maioria** — mais da metade das
+repetições, isto é, ao menos 3 de 5 —, caindo para a mediana caso contrário. Aplicada aos dados
+acima, ela preserva a moda do NestJS (4/5), não altera o Django (moda e mediana coincidem em
+750) e leva o Laravel de 350 para 325. Está em `resumir_patamares`, em
+`scripts/analyze-capacity.py`.
+
+### 12.3 Efeito de posição, agora medido
+
+Capacidade de cada execução relativa à mediana do próprio framework, agrupada pela posição que
+o tratamento ocupou na rodada:
+
+| Posição na rodada | 1 | 2 | 3 | 4 | 5 |
+|---|---:|---:|---:|---:|---:|
+| Desvio médio | +3,7% | 0,0% | +1,4% | −3,0% | −5,6% |
+
+Cerca de nove pontos percentuais entre a primeira e a última posição, de forma quase monótona.
+A intercalação **não elimina** o efeito: ela o distribui entre os cinco tratamentos, que é
+exatamente o que a seção 3.6.1 da monografia afirma. O dado permite trocar o argumento por uma
+medida.
+
+Não há efeito de rodada: os desvios médios por rodada são −0,4%, +1,5%, −4,1%, −4,2% e +3,7%,
+sem tendência. Não houve deriva ao longo das três horas de sessão.
+
+### 12.4 O que ainda falta
+
+| Símbolo | Situação |
+|---|---|
+| [C_min] | **325 req/s**, fechado |
+| níveis | **81 / 162 / 243 req/s**, fechados |
+| [Z] | 20 s; ver a ressalva da seção 12.5 |
+| aquecimento, [k], limiar | dependem da execução de reconfirmação, agora possível: ela roda no nível intermediário, 162 req/s |
+| [CV], [H] | deixaram de ser lacunas; passam a ser resultado a reportar |
+
+### 12.5 Ressalva sobre [Z] e o NestJS
+
+O NestJS foi o único framework a exibir curva não monótona no estudo-piloto (54,59 ms a 1.400
+req/s contra 38,40 ms a 1.500), padrão que reapareceu no ensaio a seco. Com 28.000 requisições
+por janela de 20 s, isso não é ruído de amostra pequena: é variabilidade real do sistema dentro
+da janela. Uma janela maior faria a média sobre mais desses eventos transitórios.
+
+A distinção importa porque foi essa não monotonicidade que motivou a regra do "último patamar
+antes da primeira violação" na seção 3.4.2. Se ela for função do comprimento da janela, a regra
+descreve o instrumento; se for do framework, descreve o objeto. Uma repetição do NestJS com
+[Z] = 60 s resolve, a um custo de cerca de 30 minutos. Não justifica elevar [Z] para todos: a
+transição dos outros quatro é de duas ordens de grandeza, e o teste formal iria de três para
+cerca de treze horas.

@@ -1,0 +1,11 @@
+rate_target,achieved_rps,p95_ms,avg_ms,error_rate,dropped,vus_max_used,estagio
+100,100.05,9.97,6.69,0.000000,0,200,grosso
+200,200.05,8.95,5.85,0.000000,0,200,grosso
+300,300.05,8.86,5.85,0.000000,0,300,grosso
+400,182.25,2801.32,2200.19,0.000000,4355,400,grosso
+325,325.05,8.85,5.89,0.000000,0,325,fino
+350,350.05,9.15,6.00,0.000000,0,350,fino
+375,188.90,2564.09,1924.85,0.000000,3723,375,fino
+# livros_ao_final=209554 (semente=200000)
+# capacidade_observada=350 (resolucao=+-12.5)
+# fim motivo=fino:p95>=100+descartadas
