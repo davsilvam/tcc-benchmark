@@ -30,12 +30,19 @@ import sys
 TOL = 0.10
 
 
+# Par adotado, calibrado na reconfirmação de 30/09/2026 a 162 req/s (seção 13 de
+# docs/versoes-e-configuracao.md). O limiar de 2% é o que Georges, Buytaert e Eeckhout (2007)
+# adotam na própria avaliação — a seção 4.2 deles define o regime pelo CoV de k iterações
+# abaixo de "0.01 or 0.02". O k, porém, não é transportável: lá cada medição é uma iteração de
+# benchmark dentro de uma invocação da máquina virtual; aqui é um intervalo de 10 s que já
+# agrega mais de mil requisições. O k = 10 deles é inatingível a 2% neste aparato, e não por
+# instabilidade: com latência de regime entre 2,5 e 5,9 ms, um único transitório — o Spring
+# Boot tem um pico isolado de 16 ms — contamina dez janelas consecutivas. k = 5 é a maior
+# janela em que os cinco frameworks atingem 2%, com pior caso de 90 s.
 CV_MAX = 0.02
-# k = 10 e o limiar de 2% são os de Georges, Buytaert e Eeckhout (2007): a seção 4.2
-# define o regime pelo CoV de k iterações abaixo de "0.01 or 0.02", e a avaliação deles
-# retém k = 10 com CoV < 0,02. As janelas menores ficam para comparação — com k = 10 e
-# intervalos de 10 s, o critério não consegue apontar regime antes dos 90 s, por
-# construção da janela, e convém ver o que janelas curtas dizem no mesmo dado.
+K_ADOTADO = 5
+# As demais janelas ficam no relatório para comparação, e para que a escolha de K_ADOTADO
+# seja verificável em vez de asseverada.
 JANELAS = (3, 5, 6, 10)
 
 
@@ -159,7 +166,9 @@ def main(padroes):
     print('Regime estável pelo critério do coeficiente de variação (CV < %.0f%% numa janela'
           % (CV_MAX * 100))
     print('de k intervalos de %d s) — Georges, Buytaert e Eeckhout (2007):' % linhas[0]['passo'])
-    print('%-12s ' % 'framework' + '  '.join('k=%-22d' % k for k in JANELAS))
+    print('%-12s ' % 'framework'
+          + '  '.join('%-24s' % ('k=%d%s' % (k, ' (adotado)' if k == K_ADOTADO else ''))
+                      for k in JANELAS))
     for a in linhas:
         celulas = []
         for k in JANELAS:
@@ -168,6 +177,17 @@ def main(padroes):
                 'não atingido' if j['inicio'] is None
                 else '%d s (%.0f%% das janelas)' % (j['inicio'], j['fracao'] * 100)))
         print('%-12s ' % a['framework'] + '  '.join(celulas))
+
+    adotados = [a['cvJanela'][K_ADOTADO]['inicio'] for a in linhas]
+    print()
+    if any(x is None for x in adotados):
+        faltam = [a['framework'] for a in linhas if a['cvJanela'][K_ADOTADO]['inicio'] is None]
+        print('PAR ADOTADO (k=%d, %.0f%%): NÃO atingido por %s — recalibrar.'
+              % (K_ADOTADO, CV_MAX * 100, ', '.join(faltam)))
+    else:
+        pior = max(adotados)
+        print('Par adotado (k=%d, CV < %.0f%%): pior caso %d s.'
+              % (K_ADOTADO, CV_MAX * 100, pior))
 
     print()
     for a in linhas:

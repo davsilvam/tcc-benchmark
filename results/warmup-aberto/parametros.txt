@@ -1,0 +1,3 @@
+commit=72134db
+nivel_intermediario=162 req/s (50% de C_min=325)
+iniciado_em=2026-09-30T12:31:39-03:00 rate=162 duration=600s bucket_s=10

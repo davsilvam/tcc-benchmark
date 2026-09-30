@@ -1100,3 +1100,102 @@ descreve o instrumento; se for do framework, descreve o objeto. Uma repetição 
 [Z] = 60 s resolve, a um custo de cerca de 30 minutos. Não justifica elevar [Z] para todos: a
 transição dos outros quatro é de duas ordens de grandeza, e o teste formal iria de três para
 cerca de treze horas.
+
+---
+
+## 13. Reconfirmação do aquecimento sob o modelo aberto (30/09/2026)
+
+Execução no nível intermediário do teste de carga fixa, 162 req/s, por 600 s em cada
+framework, com contêiner recém-criado e base restaurada. Produzida pelo commit `72134db`.
+Reprodução:
+
+```bash
+RATE=162 DURATION=600s BUCKET_S=10 OUT=results/warmup-aberto ./scripts/verify-warmup.sh
+```
+
+A duração é o dobro da padrão de propósito: era preciso enxergar o platô muito além do
+período de aquecimento em exame, e não apenas verificar se ele havia sido alcançado.
+
+### 13.1 Resultado
+
+| Framework | 1º intervalo | Regime | Entrada (±10%) | Regime (k=5, 2%) | Erro |
+|---|---:|---:|---:|---:|---:|
+| Spring Boot | 594,3 ms | 2,50 ms | 50 s | **90 s** | 0% |
+| ASP.NET Core | 87,0 ms | 2,61 ms | 10 s | 60 s | 0% |
+| NestJS | 3,3 ms | 2,76 ms | 10 s | 70 s | 0% |
+| Django | 10,2 ms | 3,65 ms | 10 s | 50 s | 0% |
+| Laravel | 6,5 ms | 5,87 ms | 0 s | 50 s | 0% |
+
+**Os 150 s adotados se confirmam com folga:** 67% de margem sobre o pior caso de 90 s. Taxa de
+erro nula nos cinco, de modo que o critério de aceite 8.3 fica satisfeito também sob o modelo
+aberto.
+
+### 13.2 A estimativa anterior de ~350 s estava errada
+
+Antes desta execução, estimou-se por modelo de volume acumulado que o Spring Boot precisaria
+de cerca de 350 s a esta taxa, e recomendou-se orçar cerca de 8 h adicionais à campanha. **A
+medição refuta a estimativa**, e o registro do erro fica porque o raciocínio chegou a entrar na
+redação da metodologia.
+
+A série do Spring Boot mostra o que de fato ocorre:
+
+```
+594  5  3  3  3  3  3  3  3  3  3 ...   (média em ms, intervalos de 10 s)
+```
+
+Um intervalo de 594 ms — 1.620 requisições — e o tratamento está aquecido.
+
+O erro foi tomar os "90 s até o regime" do piloto de modelo fechado como medida de compilação
+em tempo de execução e escalá-los pelo volume acumulado. A 100 VUs concorrentes o Spring Boot
+estava **saturado**: o regime de 104 ms daquele piloto era latência de fila, não latência
+quente do framework. O regime verdadeiro, medido agora sob taxa de chegada fixa em cerca de
+10% da capacidade, é de **2,50 ms** — quarenta vezes menor. A premissa do volume acumulado vale
+para o compilador; a grandeza à qual ela foi aplicada não era compilação.
+
+A consequência prática é que a campanha volta à estimativa de cerca de 19 h, e não 27 h.
+
+### 13.3 O par (k, limiar): 5 e 2%
+
+Pior caso entre os cinco frameworks, por par, sobre as mesmas séries:
+
+| k | 2% | 3% | 5% | 10% |
+|---|---|---|---|---|
+| 3 | 70 s | 70 s | 50 s | 40 s |
+| **5** | **90 s** | 90 s | 70 s | 70 s |
+| 6 | 220 s | 100 s | 80 s | 80 s |
+| 10 | **não atingido** | 200 s | 200 s | 110 s |
+
+**Adotado: k = 5 intervalos de 10 s, com CV < 2%.** Três razões. O limiar de 2% é o que
+Georges, Buytaert e Eeckhout (2007) adotam na própria avaliação. É a maior janela em que os
+cinco frameworks atingem esse limiar. E os 90 s resultantes cabem nos 150 s de aquecimento com
+margem.
+
+O k = 10 dos autores permanece inatingível a 2%, mas por motivo diferente do observado no
+piloto de modelo fechado. Lá o obstáculo era o piso de ruído alto, de 4,6% a 17,2%, produzido
+pela saturação. Aqui os pisos são baixos — Laravel 2,3%, Django 3,3%, NestJS 6,5%, ASP.NET
+Core 7,5%. O obstáculo passou a ser a escala: com latência de regime de 2,5 ms, um único evento
+transitório destrói a janela. O Spring Boot tem um pico isolado de 16 ms no intervalo 33 que
+contamina dez janelas consecutivas e leva o coeficiente de variação da cauda dele a 80%.
+
+O par está em `CV_MAX` e `K_ADOTADO`, em `scripts/analyze-warmup.py`, que passou a reportar o
+pior caso do par adotado e a sinalizar quando algum framework não o atinge.
+
+### 13.4 Convergência de dois critérios independentes
+
+O critério de ±10% em torno do regime e o critério do coeficiente de variação foram calculados
+sobre os mesmos dados sem partilhar formulação. O primeiro sugere 90 s de aquecimento como
+pior caso com margem; o segundo dá pior caso de 90 s. A coincidência não prova a suficiência do
+período, mas mostra que ela não depende de qual dos dois critérios se adote.
+
+### 13.5 O que resta
+
+| Símbolo | Situação |
+|---|---|
+| aquecimento | **150 s**, confirmado com 67% de margem |
+| [k], limiar | **5 intervalos, CV < 2%**, fechados |
+| [C_min], níveis | 325 req/s; 81 / 162 / 243 req/s |
+| [CV], [H] | resultado a reportar, e não lacuna a preencher |
+| [Z] | 20 s; a ressalva da seção 12.5 sobre o NestJS segue aberta |
+
+Nada mais bloqueia a campanha. O piloto de variabilidade deixa de ser etapa separada: suas
+execuções são execuções do nível intermediário e contam como as primeiras repetições.
