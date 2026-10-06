@@ -185,6 +185,21 @@ medir_patamar() {
 # execucoes vazias e indistinguivel de um experimento bem-sucedido.
 falhas=()
 
+# Interrupção limpa. Matar o processo do script NÃO mata o que ele deixou rodando: o
+# contêiner da aplicação fica de pé, e o `docker run` do k6 vira órfão de PPID 1 e segue
+# executando o patamar, porque quem o executa é o daemon e não o cliente. Em 06/10/2026
+# isso deixou a máquina com 476% de CPU ocupada vários minutos depois de o experimento
+# ter sido mandado parar.
+limpar() {
+  local st=$?
+  trap - EXIT INT TERM
+  [ -n "${fw:-}" ] && app_down "$fw" >/dev/null 2>&1
+  local img="${K6_IMAGE:-grafana/k6:2.2.0}"
+  docker ps -q --filter "ancestor=$img" 2>/dev/null | xargs -r docker rm -f >/dev/null 2>&1
+  exit "$st"
+}
+trap limpar EXIT INT TERM
+
 for rep in $(seq 1 "$REPS"); do
   read -r -a ORDER <<< "$(shuffle "$((ORDER_SEED * 1000 + rep))" "${FRAMEWORKS[@]}")"
   if ! grep -q "^$rep," "$OUT/ordem.csv"; then
