@@ -79,15 +79,35 @@ def satisfaz(p, x):
 
 
 def capacidade(patamares, x):
+    """Capacidade pela primeira violação CONFIRMADA: dois patamares consecutivos violando.
+
+    Uma violação isolada é tratada como transitória e a varredura prossegue. Sem isso, o
+    critério mede, para um framework com transitórios esporádicos, a taxa em que o primeiro
+    deles calha de cruzar o teto, e não a capacidade: no teste de 30/09/2026 o NestJS parava
+    com p95 de 101 ms e ZERO iterações descartadas, voltando a 8 ms no patamar seguinte,
+    enquanto os outros quatro paravam com milhares de descartes e latência cem vezes maior.
+
+    Quando o arquivo termina numa violação sem patamar posterior, ela é tratada como parada,
+    e não como transitória: é o que ocorre nos arquivos anteriores a esta regra, em que a
+    varredura parava na primeira violação, e presumir o contrário inventaria capacidade.
+
+    Devolve (maior patamar que satisfaz, último antes da violação confirmada, transitórios).
+    """
     ok = [p['rate'] for p in patamares if satisfaz(p, x)]
     maior = max(ok) if ok else None
     ultimo = None
-    for p in patamares:
-        if satisfaz(p, x):
-            ultimo = p['rate']
-        else:
+    transitorios = []
+    i, n = 0, len(patamares)
+    while i < n:
+        if satisfaz(patamares[i], x):
+            ultimo = patamares[i]['rate']
+            i += 1
+            continue
+        if i + 1 >= n or not satisfaz(patamares[i + 1], x):
             break
-    return maior, ultimo
+        transitorios.append(patamares[i]['rate'])
+        i += 1
+    return maior, ultimo, transitorios
 
 
 def resumir_patamares(valores):
@@ -179,7 +199,7 @@ def main():
                 print('%-11s rep%02d  SEM MEDIÇÃO (%s) — excluída do resumo'
                       % (fw, rep, motivo or 'nenhum patamar no arquivo'))
                 continue
-            maior, ultimo = capacidade(pats, x)
+            maior, ultimo, transitorios = capacidade(pats, x)
             # A seção 3.4.2 define a capacidade como o ÚLTIMO patamar antes da primeira
             # violação, e não o maior que satisfaz: a varredura é cumulativa, de modo que a
             # passagem por um patamar violado integra o percurso até os seguintes, e um
@@ -188,8 +208,11 @@ def main():
             # usado na coleta, que é justamente o sexto eixo de sensibilidade (seção 3.5.4).
             valores.append(ultimo)
             aviso = ''
+            if transitorios:
+                aviso += '  [%d transitório(s) ignorado(s): %s req/s]' % (
+                    len(transitorios), ', '.join(str(t) for t in transitorios))
             if maior != ultimo:
-                aviso = '  (curva não monótona: maior patamar que satisfaz = %s, descartado)' % maior
+                aviso += '  (curva não monótona: maior patamar que satisfaz = %s, descartado)' % maior
             if pats and ultimo == pats[-1]['rate'] and motivo == 'max_rate':
                 aviso += '  ATENÇÃO: atingiu MAX_RATE sem violar; capacidade é limite inferior'
             print('%-11s rep%02d  %s req/s%s' % (fw, rep, ultimo, aviso))

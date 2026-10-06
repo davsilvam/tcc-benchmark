@@ -231,7 +231,24 @@ for rep in $(seq 1 "$REPS"); do
     violado=0
     estado=""; violacao=""; dados=""
 
-    # Estagio grosso: passo STEP ate a primeira violacao.
+    # A subida só para quando DOIS patamares consecutivos violam. Uma violação isolada é
+    # tratada como transitória e a subida prossegue, registrando-a.
+    #
+    # A razão está nos dados de 30/09/2026. Quatro dos cinco frameworks param por saturação
+    # inequívoca: latência duas a três ordens de grandeza acima do teto e milhares de iterações
+    # descartadas. O NestJS parava com p95 de 101 ms, um milissegundo acima do teto, e ZERO
+    # descartes, voltando a 8 ms no patamar seguinte. Sem confirmação, o que se mede nele não é
+    # capacidade, e sim a taxa em que o primeiro transitório esporádico calha de cruzar o teto —
+    # uma grandeza que depende do comprimento do patamar. Daí a capacidade dele cair de 1.575
+    # req/s com patamares de 20 s para 1.000 com patamares de 60 s, e o coeficiente de variação
+    # subir de 0,7% para 12%, enquanto os outros quatro mal se movem.
+    #
+    # `pendente` guarda a taxa de uma violação ainda não confirmada; `violado` recebe a PRIMEIRA
+    # do par confirmado, que é a borda superior do intervalo a refinar.
+    pendente=0
+    transitorios=""
+
+    # Estagio grosso: passo STEP ate a primeira violacao confirmada.
     for i in $(seq 0 $((MAX_STEPS - 1))); do
       taxa=$((START + i * STEP))
       if [ "$taxa" -gt "$MAX_RATE" ]; then motivo="max_rate"; break; fi
@@ -239,9 +256,23 @@ for rep in $(seq 1 "$REPS"); do
 
       medir_patamar "$taxa" grosso
       if [ "$estado" = "ERRO" ]; then motivo="$violacao"; break; fi
-      if [ "$estado" = "PARA" ]; then motivo="$violacao"; violado="$taxa"; break; fi
 
-      ultimo_ok="$taxa"
+      if [ "$estado" = "PARA" ]; then
+        if [ "$pendente" -gt 0 ]; then
+          motivo="$violacao"
+          violado="$pendente"
+          break
+        fi
+        pendente="$taxa"
+        echo "    (violação em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
+      else
+        if [ "$pendente" -gt 0 ]; then
+          echo "    (a violação em $pendente req/s não se confirmou: transitória)"
+          transitorios="$transitorios $pendente"
+          pendente=0
+        fi
+        ultimo_ok="$taxa"
+      fi
       [ "$i" -eq $((MAX_STEPS - 1)) ] && motivo="limite_de_patamares"
     done
 
@@ -250,16 +281,38 @@ for rep in $(seq 1 "$REPS"); do
     # no primeiro patamar, nao ha intervalo a refinar, e a capacidade fica abaixo de START.
     if [ "$violado" -gt 0 ] && [ "$ultimo_ok" -gt 0 ] && [ "$FINE_STEP" -lt "$STEP" ]; then
       echo "  --- refinando ($ultimo_ok, $violado) com passo $FINE_STEP"
+      pendente=0
       taxa=$((ultimo_ok + FINE_STEP))
       while [ "$taxa" -lt "$violado" ]; do
         if [ "$seg" -gt "$MAX_SEGMENT" ]; then motivo="limite_de_segmentos"; break; fi
         medir_patamar "$taxa" fino
         if [ "$estado" = "ERRO" ]; then motivo="$violacao"; break; fi
-        if [ "$estado" = "PARA" ]; then motivo="fino:$violacao"; break; fi
-        ultimo_ok="$taxa"
+
+        if [ "$estado" = "PARA" ]; then
+          if [ "$pendente" -gt 0 ]; then
+            motivo="fino:$violacao"
+            break
+          fi
+          pendente="$taxa"
+          echo "    (violação em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
+        else
+          if [ "$pendente" -gt 0 ]; then
+            echo "    (a violação em $pendente req/s não se confirmou: transitória)"
+            transitorios="$transitorios $pendente"
+            pendente=0
+          fi
+          ultimo_ok="$taxa"
+        fi
         taxa=$((taxa + FINE_STEP))
       done
+      # Saiu do laço com violação pendente: o patamar `violado`, já medido e violando, é o
+      # patamar consecutivo seguinte e serve de confirmação.
+      if [ "$pendente" -gt 0 ] && [ "$motivo" != "fino:$violacao" ]; then
+        motivo="fino:confirmado_por_$violado"
+      fi
     fi
+
+    [ -n "$transitorios" ] && echo "# transitorios=$transitorios (violaram sem confirmacao)" >> "$csv"
     rm -f "$json"
     # A base NÃO é restaurada entre patamares, e 20% das requisições são inserções: nos
     # patamares altos isso acrescenta linhas à tabela `books`, de modo que parte da variação
