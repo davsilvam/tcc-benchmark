@@ -1199,3 +1199,126 @@ período, mas mostra que ela não depende de qual dos dois critérios se adote.
 
 Nada mais bloqueia a campanha. O piloto de variabilidade deixa de ser etapa separada: suas
 execuções são execuções do nível intermediário e contam como as primeiras repetições.
+
+---
+
+## 14. Teste de capacidade com confirmação de violação (06/10/2026)
+
+Reexecução das vinte e cinco células do teste formal, após a seção 12, sob duas regras novas
+de parada. Substitui os resultados da seção 12, preservados em
+`results/capacity-v1-sem-confirmacao/`. Reprodução:
+
+```bash
+START=100 STEP=100 FINE_STEP=25 STEP_S=20 P95_MAX=100 MAX_RATE=3000 \
+  WARMUP_DURATION=150s REPS=5 OUT=results/capacity ./scripts/run-capacity.sh
+python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
+```
+
+A execução foi interrompida com 15 das 25 células concluídas e retomada em seguida; a
+retomada por célula funcionou como previsto, refazendo apenas a célula parcial. Tempo de
+máquina total em torno de 3h45min.
+
+### 14.1 Resultado
+
+| Framework | Repetições (req/s) | Valor-resumo | Critério | CV |
+|---|---|---:|---|---:|
+| Laravel | 275 325 325 325 350 | **325** | moda (3/5) | 8,6% |
+| Django | 675 700 775 800 800 | **775** | mediana | 7,8% |
+| Spring Boot | 1300 1375 1400 1450 1500 | **1.400** | mediana | 5,4% |
+| NestJS | 1275 1375 1525 1575 1600 | **1.525** | mediana | 9,5% |
+| ASP.NET Core | 1500 1600 1700 2050 2325 | **1.700** | mediana | 18,7% |
+
+**[C_min] = 325 req/s (Laravel).** Níveis do teste de carga fixa: **81, 162 e 243 req/s**,
+arredondados para baixo a partir de 81,25, 162,50 e 243,75. São os mesmos valores que a seção
+12 produzia, por coincidência numérica e não por equivalência de método.
+
+### 14.2 Primeira regra: confirmação da violação de p95
+
+A seção 12 definia a capacidade pelo último patamar antes da **primeira** violação. Isso
+media, para um framework com eventos transitórios, a taxa em que o primeiro deles calha de
+cruzar o teto, e não a capacidade. A grandeza assim medida depende da duração do patamar: a
+capacidade do NestJS caía de 1.575 req/s com patamares de 20 s para 1.000 com patamares de
+60 s, e o coeficiente de variação subia de 0,7% para 12%.
+
+Aqueles 0,7% mereciam desconfiança e não foram desconfiados a tempo. Não eram precisão: eram
+a varredura truncando reiteradamente no mesmo evento precoce, isto é, medindo com consistência
+a coisa errada. Sob a regra atual o CV do NestJS é de 9,5%, da mesma ordem dos demais.
+
+A regra passou a exigir que a violação se repita no patamar imediatamente seguinte.
+
+### 14.3 Segunda regra: descarte de iterações é terminal
+
+A confirmação, aplicada a **qualquer** violação, produziu um resultado indefensável. Na
+repetição 4 do Spring Boot:
+
+```
+   1300 req/s   p95    5,4 ms   descartes      0
+   1400 req/s   p95 2820,4 ms   descartes 13291   <- colapso
+   1500 req/s   p95    5,8 ms   descartes      0
+   1600 req/s   p95 2775,2 ms   descartes 14395   <- colapso
+   1700 req/s   p95    5,8 ms   descartes      0
+```
+
+Como as taxas seguintes voltavam ao normal, os dois colapsos foram tratados como transitórios
+e a capacidade foi reportada como 1.700 req/s. Isso contradiz a definição do próprio texto: a
+seção 3.4.2 da monografia descreve o descarte de iterações como condição operacional de
+saturação, e uma taxa em que o sistema saturou não é uma taxa que ele sustentou.
+
+Descarte de iterações e taxa de erro passaram a interromper a varredura de imediato. Só o teto
+de p95 pede confirmação, que é onde está o ruído de medição. Das 19 violações isoladas
+observadas nas 25 varreduras, **9 são de p95 com zero descartes**, em três dos cinco
+frameworks (ASP.NET Core, NestJS e Spring Boot); as outras 10 trazem descartes e passam a ser
+terminais.
+
+A mudança **não exigiu reexecução**: a regra nova para antes da anterior, sempre num prefixo
+da mesma curva, de modo que os dados coletados a sustentam.
+
+### 14.4 Procedência dos arquivos
+
+Os CSVs em `results/capacity/` foram gravados pelo script sob a regra intermediária, que exigia
+confirmação para qualquer violação. Em consequência, as linhas `# transitorios=` e
+`# capacidade_observada=` neles **refletem aquela regra**, e não a final. Os valores
+autoritativos são os do `analyze-capacity.py`, que aplica a regra de 14.3 na leitura. Quem for
+reler os arquivos diretamente precisa saber disso.
+
+### 14.5 Biestabilidade do Spring Boot
+
+O comportamento mostrado em 14.3 não é degradação progressiva: o tratamento alterna entre
+5,8 ms e 2,8 s em taxas adjacentes. A interpretação plausível é uma cascata disparada por
+evento transitório, em que as requisições se acumulam, o conjunto de conexões se esgota e o
+gerador deixa de iniciar iterações no instante previsto. Como cada patamar é uma invocação
+independente do k6, com conexões novas, a cascata não atravessa para o patamar seguinte.
+
+É característica do sistema sob teste, e não do instrumento. Pode valer uma linha na seção
+3.6.1 da monografia, para antecipar a pergunta.
+
+### 14.6 Dispersão e o caso do ASP.NET Core
+
+O CV do ASP.NET Core é de 18,7%, o maior dos cinco, com repetições entre 1.500 e 2.325 req/s.
+Não é piora da medição: é a dispersão real de quando ele satura pela primeira vez, que a regra
+da seção 12 escondia ao ignorar saturações. Ele é o framework com mais eventos de saturação
+esporádica, dez nas cinco execuções, contra cinco do Spring Boot, dois do Laravel, dois do
+NestJS e nenhum do Django.
+
+Convém registrar que, para esse tratamento, a leitura alternativa da definição — o maior
+patamar que satisfaz as condições — daria valores bem mais altos, até 2.475 req/s numa
+repetição cujo valor adotado é 1.500. A distância entre as duas leituras mede o quanto a
+capacidade dele é esporádica, e é mais um argumento para a leitura conservadora adotada.
+
+### 14.7 Estado
+
+| Símbolo | Valor |
+|---|---|
+| [X] | 100 ms |
+| [Y] | 100 req/s no estágio grosso, 25 no fino; resolução ±12,5 |
+| [Z] | 20 s |
+| [N_A] | 5 |
+| [D] | 300 s |
+| aquecimento | 150 s |
+| [k], limiar | 5 intervalos de 10 s, CV < 2% |
+| [C_min] | **325 req/s** |
+| níveis | **81 / 162 / 243 req/s** |
+| [CV], [H] | resultado a reportar |
+
+O aparato está fechado. Resta a campanha: 5 frameworks × 3 níveis × 10 repetições, cerca de
+19 h, com retomada por célula.

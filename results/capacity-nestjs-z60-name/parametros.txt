@@ -1,0 +1,8 @@
+commit=8ce8612
+objetivo=verificar se os picos de p95 do NestJS decorrem da cardinalidade de series do k6
+comparacao=results/capacity-nestjs-z60 (identico, sem o rotulo name)
+iniciado_em=2026-09-30T18:01:56-03:00
+start=100 step=100 fine_step=25 step_s=60 max_rate=3000
+p95_max=100 p95_safety=5000 reps=3
+order_seed=20260925
+warmup=150s@100rps frameworks=nestjs

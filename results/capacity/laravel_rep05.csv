@@ -1,0 +1,13 @@
+rate_target,achieved_rps,p95_ms,avg_ms,error_rate,dropped,vus_max_used,estagio
+100,100.05,9.27,6.29,0.000000,0,200,grosso
+200,200.00,8.93,5.95,0.000000,0,200,grosso
+300,300.05,9.22,6.08,0.000000,0,300,grosso
+400,178.20,3178.33,2185.04,0.000000,4437,400,grosso
+500,182.75,3656.10,2836.23,0.000000,6346,500,grosso
+325,325.05,9.94,6.63,0.000000,0,325,fino
+350,335.85,1805.07,181.35,0.000000,283,350,fino
+375,375.00,9.24,6.14,0.000000,0,375,fino
+# transitorios= 350 (violaram sem confirmacao)
+# livros_ao_final=210872 (semente=200000)
+# capacidade_observada=375 (resolucao=+-12.5)
+# fim motivo=p95>=100+descartadas
