@@ -1305,7 +1305,46 @@ patamar que satisfaz as condições — daria valores bem mais altos, até 2.475
 repetição cujo valor adotado é 1.500. A distância entre as duas leituras mede o quanto a
 capacidade dele é esporádica, e é mais um argumento para a leitura conservadora adotada.
 
-### 14.7 Estado
+### 14.7 A regra de resumo, e uma divergência entre texto e código
+
+O valor-resumo de cada framework sai do `resumir_patamares`, em
+`scripts/analyze-capacity.py`, que exige **maioria** das repetições para adotar a moda e cai
+para a mediana quando nenhum patamar a reúne. A exigência de maioria foi decidida em
+30/09/2026 pelo motivo registrado em 12.2: com [N_A] = 5 e resolução de 25 req/s, um valor
+repetido em duas de cinco repetições quase não se distingue dos que aparecem uma vez, e aquela
+moda fraca caiu justamente sobre o maior valor observado do framework que define o C_min.
+
+A seção 3.4.2 da monografia, porém, descreveu a regra até 06/10/2026 como "patamar mais
+frequentemente sustentado entre as repetições ou, na ausência de moda, pela mediana" — moda
+simples, sem exigência de maioria. A decisão foi registrada aqui e implementada no código, mas
+a frase correspondente da monografia não foi atualizada na ocasião.
+
+Sobre os dados desta seção, as duas leituras divergem em um framework:
+
+| Framework | Repetições | Moda simples | Maioria (adotada) |
+|---|---|---:|---:|
+| Laravel | 275 325 325 325 350 | 325 (moda, 3/5) | 325 (moda, 3/5) |
+| **Django** | 675 700 775 800 800 | **800** (moda, 2/5) | **775** (mediana) |
+| Spring Boot | 1300 1375 1400 1450 1500 | 1.400 (mediana) | 1.400 (mediana) |
+| NestJS | 1275 1375 1525 1575 1600 | 1.525 (mediana) | 1.525 (mediana) |
+| ASP.NET Core | 1500 1600 1700 2050 2325 | 1.700 (mediana) | 1.700 (mediana) |
+
+O [C_min] não depende da escolha: é 325 req/s nas duas leituras, e os níveis permanecem 81,
+162 e 243 req/s. O que muda é o valor do Django, que entra no modelo multicritério como
+critério de capacidade.
+
+### 14.8 Os dados da seção 12 estão superados
+
+Registra-se porque a confusão já ocorreu uma vez. As capacidades do Laravel na seção 12 são
+350, 350, 300, 275 e 325 req/s; as desta seção são 275, 325, 325, 325 e 350. São execuções
+distintas, sob regras de parada distintas, e **apenas as desta seção valem**. Aplicar a regra
+de resumo aos números da seção 12 dá C_min de 350 req/s e níveis de 87, 175 e 262, que não são
+os do aparato.
+
+Os arquivos da seção 12 seguem em `results/capacity-v1-sem-confirmacao/` para comparação, e não
+para uso.
+
+### 14.9 Estado
 
 | Símbolo | Valor |
 |---|---|
