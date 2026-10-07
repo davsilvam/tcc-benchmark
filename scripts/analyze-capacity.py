@@ -120,12 +120,20 @@ def capacidade(patamares, x):
 
 
 def resumir_patamares(valores):
-    """Patamar modal entre as repeticoes; na ausencia de moda, a mediana.
+    """Patamar sustentado na MAIORIA das repeticoes; sem maioria, a mediana.
 
     A secao 3.4.2 da monografia descarta a media aritmetica: a capacidade so assume valores
     discretos, multiplos do passo fino, e uma media sugeriria resolucao superior a do
-    instrumento. A moda exige um valor mais frequente que todos os outros; com N_A impar e
-    repeticoes todas distintas nao ha moda, e a mediana cai sempre sobre um patamar observado.
+    instrumento.
+
+    A moda exige maioria estrita, e nao apenas ser o valor mais frequente. Com N_A = 5 e
+    resolucao de 25 req/s, um valor repetido em 2 de 5 repeticoes quase nao se distingue dos
+    que aparecem uma vez, e no teste de 30/09/2026 essa moda fraca caiu sobre o MAIOR valor
+    observado do Laravel, o framework que define o C_min e, com ele, os tres niveis da campanha.
+    Sem a exigencia de maioria, aquelas repeticoes (350 350 300 275 325) devolveriam 350; com
+    ela, devolvem a mediana, 325.
+
+    A mediana cai sempre sobre um patamar observado quando N_A e impar.
     """
     v = sorted(x for x in valores if x is not None)
     if not v:
