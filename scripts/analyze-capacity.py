@@ -99,13 +99,22 @@ def capacidade(patamares, x):
     transitorios = []
     i, n = 0, len(patamares)
     while i < n:
-        if satisfaz(patamares[i], x):
-            ultimo = patamares[i]['rate']
+        pat = patamares[i]
+        if satisfaz(pat, x):
+            ultimo = pat['rate']
             i += 1
             continue
+        # Descarte de iteracoes ou taxa de erro sao TERMINAIS, sem confirmacao: a secao 3.4.2
+        # define o descarte como condicao operacional de saturacao, e uma taxa em que o sistema
+        # saturou nao e uma taxa que ele sustentou. Exigir confirmacao tambem aqui levava a
+        # reportar 1.700 req/s para o Spring Boot numa execucao em que 1.400 e 1.600 colapsaram
+        # com 13 mil e 14 mil iteracoes descartadas.
+        if pat['descartadas'] > 0 or pat['erro'] >= 0.01:
+            break
+        # So o teto de p95 pede confirmacao: e nele que mora o ruido de medicao.
         if i + 1 >= n or not satisfaz(patamares[i + 1], x):
             break
-        transitorios.append(patamares[i]['rate'])
+        transitorios.append(pat['rate'])
         i += 1
     return maior, ultimo, transitorios
 

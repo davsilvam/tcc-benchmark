@@ -273,13 +273,22 @@ for rep in $(seq 1 "$REPS"); do
       if [ "$estado" = "ERRO" ]; then motivo="$violacao"; break; fi
 
       if [ "$estado" = "PARA" ]; then
+        # Descarte de iterações ou erro são terminais, sem confirmação: a seção 3.4.2 define o
+        # descarte como condição operacional de saturação. Só o teto de p95 pede confirmação.
+        case "$violacao" in
+          *descartadas*|*erro*)
+            motivo="$violacao"
+            violado="$taxa"
+            break
+            ;;
+        esac
         if [ "$pendente" -gt 0 ]; then
           motivo="$violacao"
           violado="$pendente"
           break
         fi
         pendente="$taxa"
-        echo "    (violação em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
+        echo "    (violação de p95 em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
       else
         if [ "$pendente" -gt 0 ]; then
           echo "    (a violação em $pendente req/s não se confirmou: transitória)"
@@ -304,12 +313,15 @@ for rep in $(seq 1 "$REPS"); do
         if [ "$estado" = "ERRO" ]; then motivo="$violacao"; break; fi
 
         if [ "$estado" = "PARA" ]; then
+          case "$violacao" in
+            *descartadas*|*erro*) motivo="fino:$violacao"; break ;;
+          esac
           if [ "$pendente" -gt 0 ]; then
             motivo="fino:$violacao"
             break
           fi
           pendente="$taxa"
-          echo "    (violação em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
+          echo "    (violação de p95 em $taxa req/s ainda não confirmada; medindo o próximo patamar)"
         else
           if [ "$pendente" -gt 0 ]; then
             echo "    (a violação em $pendente req/s não se confirmou: transitória)"
