@@ -28,6 +28,20 @@ scripts/k6-run.sh                     executa o k6 em contêiner, na rede dos se
 scripts/run-experiment.sh             campanha completa de um framework
 apps/spring-boot/                     implementação de referência
 apps/{django,nestjs,laravel,aspnet}/  demais implementações
+results/capacity/                     teste de capacidade formal (seção 14) — ver a nota abaixo
+results/comunidade/                   indicador C3 — pull requests fechados, CSV e procedência
+results/sloc/                         contagens SLOC-A e SLOC-B (métrica da seção 7)
+results/warmup/                       séries do critério de aceite 8.3, por framework
+results/capacity-v1-sem-confirmacao/  superado, preservado para comparação; não usar
+```
+
+Os comentários `# capacidade_observada=` e `# transitorios=` gravados dentro de
+`results/capacity/*.csv` refletem a regra intermediária de parada, descrita na seção 14.4 de
+`docs/versoes-e-configuracao.md`, e não a regra final. Os valores autoritativos saem da
+análise:
+
+```bash
+python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
 ```
 
 ## Sequência de uso
@@ -47,7 +61,12 @@ k6 run -e BASE_URL=http://localhost:8080 -e FW=springboot k6/contract-test.js
 ./scripts/verify-queries.sh springboot
 ./scripts/compare-fingerprints.sh   # roda os cinco e confronta os fingerprints
 
-# 4. campanha: 3 níveis de carga x 10 repetições
+# 4. teste de capacidade — fixa o C_min e, dele, os três níveis da campanha
+START=100 STEP=100 FINE_STEP=25 STEP_S=20 P95_MAX=100 MAX_RATE=3000 \
+  WARMUP_DURATION=150s REPS=5 OUT=results/capacity ./scripts/run-capacity.sh
+python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
+
+# 5. campanha: 3 níveis de carga x 10 repetições, nos níveis que o passo 4 produziu
 RATES="..." DURATION=300s ./scripts/run-experiment.sh
 ```
 
