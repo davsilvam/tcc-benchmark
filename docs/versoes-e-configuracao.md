@@ -1319,6 +1319,11 @@ frequentemente sustentado entre as repetições ou, na ausência de moda, pela m
 simples, sem exigência de maioria. A decisão foi registrada aqui e implementada no código, mas
 a frase correspondente da monografia não foi atualizada na ocasião.
 
+**17/10/2026 — divergência sanada.** A seção 3.4.2 da monografia passou a descrever a regra
+de maioria, nos termos em que ela está em `resumir_patamares`. O parágrafo acima fica como
+registro de que texto e código estiveram em desacordo entre 30/09/2026 e 17/10/2026, e do que
+a monografia dizia nesse intervalo.
+
 Sobre os dados desta seção, as duas leituras divergem em um framework:
 
 | Framework | Repetições | Moda simples | Maioria (adotada) |
