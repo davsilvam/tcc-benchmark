@@ -7,9 +7,9 @@ coleta.
 | | |
 |---|---|
 | coleta | `ColetaC3.java` (Java 17+, Search API do GitHub, `GITHUB_TOKEN` somente leitura) |
-| dados | `c3-prs.csv`, um pull request por linha, %d registros |
+| dados | `c3-prs.csv`, um pull request por linha, 10.748 registros |
 | janela | 2025-09-10T12:01:00Z a 2026-09-10T12:01:00Z, fixa |
-| sha256 do CSV | `%s` |
+| sha256 do CSV | `6af74e2d6c485b3092019560d6b99180370dee8aa20f01fbb0e80811002bfb87` |
 
 A janela coincide com o instante da coleta de estrelas e forks, o que mantém os três
 indicadores de comunidade referidos ao mesmo momento.
@@ -97,15 +97,19 @@ Como controle positivo, o pull request 61510 do Laravel, que a coleta marca com
 `com_revisao=true`, registra duas revisões na interface. A coluna é, portanto, significativa, e
 o qualificador `-review:none` funciona no repositório do NestJS.
 
-**O zero não é defeito de coleta.** É característica do projeto, cuja integração se concentra
-em um mantenedor que incorpora sem abrir revisão formal no GitHub.
+**O zero não é defeito de coleta.** O que a coleta registra é a ausência de revisão em todos
+os 1.795 pull requests fechados do NestJS na janela, inclusive nos 325 que não são de bot e
+têm intervalo de pelo menos uma hora entre abertura e fechamento. Por que o projeto não
+registra revisões no GitHub é pergunta que estes dados não respondem, e esta documentação não
+lhe atribui causa.
 
 ## O que o indicador mede, em consequência
 
-Em repositórios de mantenedor único, a exigência de revisão mede a **prática de registro de
-revisão**, e não a intensidade da contribuição. O NestJS fechou 325 contribuições humanas com
-intervalo mínimo de uma hora na janela, e o cenário base conta zero delas. Sob normalização
-*max-min*, isso leva o tratamento ao piso do critério, e não a um valor pequeno.
+Com os filtros do cenário base, o indicador conta a contribuição que tem **revisão registrada
+no GitHub**, e não toda a contribuição fechada. No NestJS os dois números se separam por
+completo: 325 pull requests humanos com intervalo mínimo de uma hora na janela, e zero deles
+contados no cenário base. Sob normalização *max-min*, isso leva o tratamento ao piso do
+critério, e não a um valor pequeno.
 
 Duas saídas, ambas defensáveis e ambas já calculadas acima: declarar na seção 3.3 que o
 indicador capta contribuição *revisada*, caso em que o zero é achado a discutir no capítulo de
