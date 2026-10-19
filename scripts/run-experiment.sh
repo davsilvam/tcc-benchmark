@@ -40,8 +40,18 @@ require_postgres || exit 1
 
 : "${RATES:?informe RATES, ex.: RATES=\"40 80 120\" — taxas derivadas do teste de capacidade}"
 : "${DURATION:?informe DURATION, ex.: DURATION=300s — duração da medição}"
-# 150 s: o estudo-piloto mediu o Spring Boot entrando em regime aos 90 s (seção 9 de
-# docs/versoes-e-configuracao.md). Aos 60 s ele ainda estava 35% acima do regime.
+# 150 s, inalterados. A justificativa, porém, mudou duas vezes e convém não repetir a antiga.
+#
+# O número veio do estudo-piloto de modelo fechado, que media o Spring Boot entrando em regime
+# aos 90 s (seção 9). A reconfirmação de 30/09/2026 sob o modelo aberto chegou aos mesmos 90 s
+# por dois critérios independentes (seção 13.4). Em 19/10/2026, reverificado o aquecimento sob
+# o aparato com reinício do banco, os dois critérios divergiram — 130 s por um, 200 s pelo
+# outro — e a reanálise das séries brutas mostrou que AMBOS são movidos por eventos
+# posteriores ao aquecimento, não pelo aquecimento (seções 16.2 e 16.3). Sob a terceira
+# definição, insensível a esses eventos, o pior caso é de 80 s em 30/09 e 70 s em 19/10.
+#
+# Os 150 s seguem compatíveis com os dados pelas três leituras. O que falta para afirmar D.3
+# satisfeito é uma segunda série por framework: hoje há uma só de cada.
 WARMUP_DURATION="${WARMUP_DURATION:-150s}"
 REPS="${REPS:-10}"
 ORDER_SEED="${ORDER_SEED:-20260922}"
