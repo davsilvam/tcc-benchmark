@@ -28,11 +28,17 @@ scripts/k6-run.sh                     executa o k6 em contêiner, na rede dos se
 scripts/run-experiment.sh             campanha completa de um framework
 apps/spring-boot/                     implementação de referência
 apps/{django,nestjs,laravel,aspnet}/  demais implementações
+results/versions/                     versões exatas de cada tratamento, para o Apêndice
+results/fingerprint-*.json            critério de aceite 8.1 — registros idênticos nos cinco
 results/capacity/                     teste de capacidade formal (seção 14) — ver a nota abaixo
 results/comunidade/                   indicador C3 — pull requests fechados, CSV e procedência
 results/sloc/                         contagens SLOC-A e SLOC-B (métrica da seção 7)
 results/warmup-aberto/                critério de aceite 8.3, modelo aberto a 162 req/s (seção 13)
 results/warmup/                       piloto sob modelo fechado, 100 VUs; superado pela seção 13.2
+results/capacity-piloto/              estudo-piloto de capacidade, uma repetição (seção 11)
+results/capacity-laravel/             ensaio do Laravel que motivou [N_A] > 1 (seção 11.3)
+results/capacity-nestjs-z60/          NestJS com [Z] = 60 s — ressalva da seção 12.5
+results/capacity-nestjs-z60-name/     idem, com o rótulo name do k6 (commit 8ce8612)
 results/capacity-v1-sem-confirmacao/  superado, preservado para comparação; não usar
 ```
 
@@ -68,7 +74,7 @@ START=100 STEP=100 FINE_STEP=25 STEP_S=20 P95_MAX=100 MAX_RATE=3000 \
 python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
 
 # 5. campanha: 3 níveis de carga x 10 repetições, nos níveis que o passo 4 produziu
-RATES="..." DURATION=300s ./scripts/run-experiment.sh
+RATES="81 162 243" DURATION=300s ./scripts/run-experiment.sh
 ```
 
 O passo 3 é o que sustenta, perante a banca, a afirmação de que a especificação funcional
