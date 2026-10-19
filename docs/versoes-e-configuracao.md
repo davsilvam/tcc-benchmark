@@ -452,6 +452,14 @@ variabilidade para dimensionar as repetições, e só então a campanha.
 e ~21 h no total.
 Convém rodar um framework por vez e conferir os resultados antes de seguir.
 
+**19/10/2026 — os itens 4 e 5 estão vencidos.** O teste de capacidade e a reconfirmação do
+aquecimento foram executados, e as seções 12 a 14 os registram: [C_min] = 325 req/s, níveis de
+81, 162 e 243 req/s, aquecimento de 150 s. Da sequência prevista no item 4, o piloto de
+variabilidade deixou de ser etapa separada, pelo motivo da seção 13.5 — suas execuções são
+execuções do nível intermediário e contam como as primeiras repetições. E as ~21 h do item 5,
+herdadas do modelo fechado, cederam lugar às ~19 h da seção 13.2. Os dois itens ficam como
+estavam, por serem o registro do que se planejava antes de medir.
+
 ---
 
 ## 7. Estado de verificação
