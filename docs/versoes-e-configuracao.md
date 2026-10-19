@@ -1607,3 +1607,68 @@ Três saídas, nenhuma adotada aqui:
 3. Não mudar nada e confiar no `invalidas.csv`, que registra as células com descarte para
    investigação, conforme 15.3.4. Aceita refazer células e não cobre a degradação sem descarte,
    como a 2ª execução de 19/10, que não descartou nada e ainda assim levou 410 s.
+
+---
+
+## 16. Alteração do aparato: reinício do banco por célula (19/10/2026)
+
+Decidida a partir de 15.3.6. O `restart_postgres`, em `scripts/common.sh`, reinicia o
+processo do PostgreSQL e aguarda prontidão; o `run-experiment.sh` o chama antes do `reset_db`
+em cada célula, e o `verify-warmup.sh` antes de cada tratamento, para que o critério de
+aceite meça o aquecimento nas condições em que a campanha mede. Custa cerca de cinco segundos
+por célula, algo como 12 min nas 150. Falha de reinício entra em `invalidas.csv` como
+`banco_nao_reiniciou`.
+
+Corrigiu-se, no mesmo trabalho, um defeito achado de passagem: a verificação de queda do
+banco introduzida em `273a558` estava aninhada dentro do ramo de falha do `wait_health`, e não
+depois da medição, de modo que nunca rodava no caminho em que importa. Um banco que caísse
+durante a medição deixaria um JSON com 100% de erros que a retomada consideraria concluído.
+
+### 16.1 Reverificação de D.3 sob o aparato alterado
+
+`results/warmup-protocolo-v3/`, 162 req/s por 600 s nos cinco.
+
+| Framework | 1º intervalo | Regime | 1º / regime | Entrada ±10% | (k=5, CV<2%) | Erro |
+|---|---:|---:|---:|---:|---:|---:|
+| ASP.NET Core | 109,7 ms | 2,81 ms | 39,1× | 10 s | 170 s | 0% |
+| Django | 11,4 ms | 4,04 ms | 2,8× | 130 s | **50 s** | 0% |
+| Laravel | 6,1 ms | 6,09 ms | 1,0× | 0 s | 100 s | 0% |
+| NestJS | 3,4 ms | 2,81 ms | 1,2× | 30 s | 200 s | 0% |
+| Spring Boot | 331,7 ms | 2,67 ms | 124,2× | 60 s | 120 s | 0% |
+
+**O que se consertou.** O Django sai de 290 a 560 s para **50 s**, o mesmo valor de 30/09 e
+das execuções A e B de 15.3.6. A patologia que motivou a alteração desapareceu, e a taxa de
+erro é nula nos cinco, como D.3 exige.
+
+**O que não passou.** O pior caso sob o par adotado é de **200 s**, acima dos 150 s. Mas não
+é aquecimento: o NestJS começa a 3,4 ms contra regime de 2,81 ms, isto é, a 1,2× do regime —
+não há transiente a esperar. Do segundo intervalo em diante sua série tem amplitude total de
+1,20 ms e desvio de 0,25 ms, e os intervalos fora da banda de ±10% são o 1, 2, 15, 27, **48 e
+52** — espalhados por toda a execução, inclusive aos 480 s e 520 s, muito depois de qualquer
+aquecimento. O ASP.NET Core é igual: fora da banda nos intervalos 11, 30 e 50.
+
+É a fragilidade que 13.3 já havia descrito para k = 10 e que agora alcança k = 5: com regime
+de 2,8 ms, um pico isolado destrói dez janelas consecutivas, e o valor que o critério devolve
+depende de onde o ruído cai, não de quando o tratamento aqueceu.
+
+### 16.2 A convergência de 13.4 não vale mais
+
+A seção 13.4 apresentava como corroboração o fato de os dois critérios independentes — ±10% em
+torno do regime e coeficiente de variação — darem ambos 90 s. Sob esta execução eles divergem:
+o de ±10% dá pior caso de **130 s**, dentro dos 150 s adotados; o do coeficiente de variação dá
+**200 s**, fora. O argumento de convergência deixa de estar disponível, e os 150 s passam a se
+apoiar no critério de ±10% mais o argumento de que o outro é inadequado nesta escala.
+
+**Não se emitiu a tag `protocolo-v3`.** Emití-la agora seria afirmar D.3 satisfeito quando um
+dos dois critérios não o afirma. A decisão não é de aparato, e sim de método, e cabe ao texto:
+
+1. Manter os 150 s e registrar na seção 3.4.3 que o critério do coeficiente de variação é
+   reportado, mas que sua instabilidade em regimes de poucos milissegundos o torna inadequado
+   como teste de suficiência, ficando o de ±10% como operativo. É a leitura que os dados acima
+   sustentam.
+2. Elevar o aquecimento para os 210 s que o script sugere. Custa cerca de 2 h 30 na campanha e
+   **não** resolve: o critério é movido por ruído pós-aquecimento, de modo que a próxima
+   execução pode devolver outro valor.
+3. Tornar o critério robusto a pico isolado, por mediana ou variação aparada. É alteração de
+   instrumento sobre um critério citado de Georges, Buytaert e Eeckhout (2007), e exige
+   justificativa no texto.
