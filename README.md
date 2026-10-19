@@ -51,6 +51,11 @@ análise:
 python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
 ```
 
+O aparato de coleta está congelado na tag `protocolo-v2`, no commit `b5499ea`: `scripts/`,
+`k6/` e `infra/` não mudam sem nova tag. `README.md`, `docs/` e `results/` ficam fora dela.
+A seção 15 de `docs/versoes-e-configuracao.md` registra o que foi verificado antes do
+congelamento, e a ressalva que permanece.
+
 ## Sequência de uso
 
 ```bash

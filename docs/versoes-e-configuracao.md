@@ -1374,3 +1374,42 @@ para uso.
 
 O aparato está fechado. Resta a campanha: 5 frameworks × 3 níveis × 10 repetições, cerca de
 19 h, com retomada por célula.
+
+---
+
+## 15. Congelamento do protocolo (19/10/2026)
+
+O aparato de coleta está congelado na tag anotada `protocolo-v2`, que aponta para o commit
+`b5499ea`. Dali em diante, alteração em `scripts/`, `k6/` ou `infra/` quebra a comparabilidade
+das células já medidas e exige nova tag. Ficam **fora** da tag o `README.md`, o `docs/` e o
+`results/`: documentação e dados seguem sendo escritos sem que o protocolo se mova.
+
+### 15.1 Os critérios de aceite não foram reexecutados, e não precisavam ser
+
+Nada que D.1 a D.3 verificam mudou desde a execução que estabeleceu cada um.
+
+**D.1 e D.2** vêm da execução de 10/09/2026, na seção 7.1. O `k6/contract-test.js`, o
+`scripts/verify-queries.sh` e o `scripts/compare-fingerprints.sh` nunca foram alterados desde
+o commit inicial, e `apps/` só mudou em `e124eeb`, que trocou o campo `license` do
+`package.json` do NestJS de `UNLICENSED` para `MIT`. No que esses dois critérios verificam, as
+implementações sob teste são as mesmas que passaram. Os cinco `results/fingerprint-*.json`
+seguem com um único sha256, `d397c641…c476`.
+
+**D.3** vem da execução de 30/09/2026 em `results/warmup-aberto/`, cujo `parametros.txt`
+registra o commit `72134db` — o último a alterar o `verify-warmup.sh`. Recomputada em
+19/10/2026 pelo `analyze-warmup.py`: taxa de erro nula nos cinco e regime aos 90 s no pior
+caso sob (k = 5, CV < 2%), dentro dos 150 s adotados.
+
+### 15.2 Ressalva sobre D.3
+
+O `k6/load-test.js` mudou **depois** daquela execução, em `8ce8612` (30/09/2026, 18h01), que
+passou a agrupar as URLs nas métricas do k6 com o rótulo `name`. A série de aquecimento foi,
+portanto, coletada sem o rótulo, enquanto a campanha roda com ele.
+
+O efeito do rótulo foi investigado à parte, em `results/capacity-nestjs-z60-name/` contra
+`results/capacity-nestjs-z60/`. As duas execuções devolvem 1.000 e 1.350 req/s para o NestJS
+sob [Z] = 60 s, mas com três repetições cada e a dispersão conhecida do tratamento a
+comparação **não isola** o efeito do rótulo da variação entre sessões. Reexecutar o
+`verify-warmup.sh` sob o aparato congelado encerraria a ressalva, a um custo de cerca de uma
+hora de máquina. Enquanto isso não for feito, D.3 está verificado sob o `load-test.js`
+anterior ao rótulo.
