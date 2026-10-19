@@ -83,8 +83,7 @@ absoluto leva o tratamento ao piso do critério, e não a um valor pequeno.
 As taxas variam muito entre os repositórios: ASP.NET Core 76%, Django 34%, Spring Boot 5,2%,
 Laravel 1,4% e NestJS 0%. O zero exato do NestJS foi conferido em 14/10/2026, por três vias:
 
-1. o pull request 17635, não automatizado e integrado, não registra revisão, e foi incorporado
-   diretamente pelo mantenedor;
+1. o pull request 17635, não automatizado e integrado, não registra revisão;
 2. o pull request 17620 exibe **"No reviews"** na seção de revisores;
 3. a própria consulta do script, executada na busca do GitHub, devolve zero resultados:
 
