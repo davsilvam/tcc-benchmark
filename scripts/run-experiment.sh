@@ -115,16 +115,6 @@ for rep in $(seq 1 "$REPS"); do
       app_up "$fw"
       if ! wait_health "$fw"; then
         app_down "$fw"
-
-      # Se o banco caiu durante a medição, o JSON existe e é sintaticamente válido, mas
-      # descreve o ambiente quebrado e não o framework. Removê-lo é o que faz a retomada
-      # refazer a execução, já que o teste de retomada é a existência do arquivo.
-      if ! require_postgres; then
-        rm -f "$result"
-        echo "$tag,banco_caiu_durante," >> "$OUT/invalidas.csv"
-        echo "    ATENÇÃO: o banco caiu durante a medição; resultado descartado"
-        continue
-      fi
         echo "$tag,falha_de_prontidao," >> "$OUT/invalidas.csv"
         continue
       fi
@@ -140,6 +130,16 @@ for rep in $(seq 1 "$REPS"); do
       stats_stop
 
       app_down "$fw"
+
+      # Se o banco caiu durante a medição, o JSON existe e é sintaticamente válido, mas
+      # descreve o ambiente quebrado e não o framework. Removê-lo é o que faz a retomada
+      # refazer a execução, já que o teste de retomada é a existência do arquivo.
+      if ! require_postgres; then
+        rm -f "$result"
+        echo "$tag,banco_caiu_durante," >> "$OUT/invalidas.csv"
+        echo "    ATENÇÃO: o banco caiu durante a medição; resultado descartado"
+        continue
+      fi
 
       if [ -s "$result" ]; then
         python - "$result" "$tag" "$OUT/invalidas.csv" <<'PY'
