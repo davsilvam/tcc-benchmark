@@ -1556,3 +1556,54 @@ foram calibrados na condição favorável.
 Nada disso está estabelecido. Separar as duas coisas pede duas execuções do Django em máquina
 sem outra carga: uma com o PostgreSQL recém-subido e em repouso, outra imediatamente após uma
 célula de escrita intensa. Cerca de 25 min.
+
+### 15.3.6 O par de execuções: é o tempo de vida do processo do banco
+
+As duas execuções foram feitas, em `results/warmup-django-pg-novo/` (A, PostgreSQL reiniciado
+38 s antes) e `results/warmup-django-pg-usado/` (B, imediatamente após A, com o banco de pé há
+11 min e uma célula de escrita intensa no histórico). Carga ambiente medida antes de cada uma:
+os dois contêineres de outro projeto em 0,01% a 0,03% de CPU, isto é, presentes e ociosos.
+
+| Execução | Estado do PostgreSQL | 0 a 100 s | 100 a 200 s | 400 a 600 s | (k=5, CV<2%) | descartes |
+|---|---|---:|---:|---:|---:|---:|
+| 30/09 | instância nova | 4,30 ms | 3,74 ms | 3,70 ms | 50 s | 0 |
+| 19/10, 1ª | de pé há ~5 h | 5,57 ms | **676,52 ms** | 4,24 ms | 560 s | **2.786** |
+| 19/10, 2ª | de pé há ~5 h | 6,43 ms | 4,54 ms | 3,77 ms | 410 s | 0 |
+| **A** | **reiniciado há 38 s** | 4,43 ms | 3,73 ms | 3,71 ms | **50 s** | 0 |
+| **B** | de pé há 11 min, após A | 4,07 ms | 3,84 ms | 3,71 ms | **60 s** | 0 |
+
+A reprodução é limpa. A instância nova de 30/09, a reiniciada da A e a de uma célula de uso da
+B concordam entre si — 50 a 60 s pelo critério adotado, séries planas a partir do segundo
+intervalo. As duas execuções sobre a instância de cinco horas são as discordantes, e são
+também as únicas em que o aquecimento excede os 150 s adotados.
+
+**Uma célula de escrita intensa não degrada; horas de acúmulo degradam.** A B carrega uma
+execução completa de 600 s a 162 req/s, com 30% de operações de escrita e a recarga de 200 mil
+livros do `reset_db`, e ainda assim fica em 60 s. A diferença entre B e as de 19/10 não é a
+quantidade de escrita recente, e sim o tempo de vida do processo.
+
+**A causa não está identificada, e não se afirma.** Descarta-se o inchaço de tabela, porque o
+`reset_db` trunca e recarrega antes de cada execução. Descarta-se o rótulo `name`, pela seção
+15.2 e porque A e B o usam. Descartam-se os contêineres vizinhos, medidos ociosos. Restam
+candidatos não separados: estado de memória do contêiner do banco, cache de disco da máquina
+virtual do Docker, acúmulo de segmentos de WAL. Um reinício do contêiner preserva o esquema,
+porque o volume persiste e o entrypoint só executa os scripts de inicialização em diretório
+vazio — verificado nesta sessão.
+
+### 15.3.7 Consequência para a campanha, a decidir
+
+O Apêndice E mantém o banco de pé durante toda a campanha de propósito, recriando apenas o
+contêiner da aplicação. A campanha é estimada em cerca de 19 h. A degradação apareceu com o
+processo de pé havia cinco horas, de modo que a maior parte das células correria na condição
+em que o aquecimento do Django pede 290 a 560 s, e não os 150 s adotados.
+
+Três saídas, nenhuma adotada aqui:
+
+1. Reiniciar o contêiner do banco periodicamente durante a campanha — custa cerca de um
+   segundo e preserva o esquema. Toca o `run-experiment.sh`, que está congelado pela tag
+   `protocolo-v2`, e exigiria nova tag e ajuste do Apêndice E.
+2. Caracterizar o limiar, medindo a partir de quantas horas a degradação aparece, para decidir
+   com dado em lugar de margem. Custa execuções longas.
+3. Não mudar nada e confiar no `invalidas.csv`, que registra as células com descarte para
+   investigação, conforme 15.3.4. Aceita refazer células e não cobre a degradação sem descarte,
+   como a 2ª execução de 19/10, que não descartou nada e ainda assim levou 410 s.
