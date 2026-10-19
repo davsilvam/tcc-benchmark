@@ -57,7 +57,8 @@ e `fechado`.
 | Spring Boot | 675 | 70 | 605 | 485 | **35** | 15 |
 
 `C3 base` é o valor do cenário base: sem bot, intervalo de pelo menos uma hora e ao menos uma
-revisão. `C3 integrados` restringe-o aos incorporados, variante da análise de sensibilidade.
+revisão. `C3 integrados` restringe-o aos incorporados: é contagem de registro, e não
+variante da análise de sensibilidade.
 
 ## O filtro de revisão decide o ordenamento da dimensão
 
