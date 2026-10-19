@@ -16,6 +16,28 @@ do host — reprova uma série que já entrou em regime há muito tempo. O que s
                       mesma carga custaria em regime
 
 O regime estável é a média dos últimos 30% dos intervalos.
+
+TERCEIRA DEFINIÇÃO — mediana mais persistência. Proposta em 19/10/2026, DEPOIS de ver as
+séries de results/warmup-protocolo-v3, e por isso NÃO pré-registrada. Fica ao lado das duas
+anteriores, que seguem sendo reportadas, e não as substitui.
+
+O motivo é um defeito que as séries daquele dia expuseram nas duas primeiras. Um critério de
+aquecimento deve ser insensível a eventos POSTERIORES ao aquecimento, e nenhuma das duas é:
+
+  - a média dos últimos 30% é arrastada por rajada tardia. Na série do Django de 19/10 há uma
+    rajada entre 490 e 530 s, de 4,4 a 7,4 ms, contra platô de 3,62 ms desde o segundo
+    intervalo. A média da cauda sobe a 4,31 ms e a banda de ±10% vira [3,87; 4,74] — ACIMA do
+    platô real. A entrada é então reportada aos 130 s, embora o tratamento estivesse em
+    regime aos 10 s;
+  - o CV de k janelas é destruído por pico isolado, como a nota de CV_MAX já registra para
+    k = 10 e como as séries de 19/10 mostraram para k = 5: no NestJS os intervalos fora da
+    banda estão em 480 e 520 s, e o critério devolve 200 s.
+
+A terceira definição troca a média pela mediana dos últimos 30%, que a rajada não move, e
+exige que a entrada PERSISTA por K_PERSISTENCIA intervalos consecutivos, o que impede que um
+único intervalo na banda, por acidente, conte como entrada. O ruído posterior não é
+descartado: é reportado à parte, em contagem e instantes, para que se possa julgar se a
+entrada foi real e quanto ruído de fundo a série tem.
 """
 import sys
 
@@ -45,6 +67,11 @@ K_ADOTADO = 5
 # seja verificável em vez de asseverada.
 JANELAS = (3, 5, 6, 10)
 
+# Persistência exigida pela terceira definição: a entrada só conta se a série permanecer na
+# banda por esta quantidade de intervalos consecutivos. Vale 5 por simetria com K_ADOTADO, e
+# não por calibração independente — o que torna os dois números comparáveis entre si.
+K_PERSISTENCIA = 5
+
 
 def coef_var(valores):
     n = len(valores)
@@ -55,6 +82,35 @@ def coef_var(valores):
         return float('inf')
     dp = (sum((v - media) ** 2 for v in valores) / (n - 1)) ** 0.5
     return dp / media
+
+
+def mediana(valores):
+    v = sorted(valores)
+    n = len(v)
+    if not n:
+        return 0.0
+    meio = n // 2
+    return v[meio] if n % 2 else (v[meio - 1] + v[meio]) / 2.0
+
+
+def entrada_persistente(lat, regime, passo, k=K_PERSISTENCIA):
+    """Terceira definição: primeiro intervalo a partir do qual k intervalos consecutivos
+    ficam dentro de ±TOL do regime, com o regime tomado pela MEDIANA da cauda.
+
+    Devolve também as excursões POSTERIORES à entrada — instante e valor de cada intervalo
+    que sai da banda depois dela. São ruído de fundo, e não aquecimento: é a distinção que
+    as duas definições anteriores não fazem.
+    """
+    if regime <= 0 or len(lat) < k:
+        return {'inicio': None, 'excursoes': []}
+    dentro = [abs(v - regime) <= TOL * regime for v in lat]
+    inicio = next((i for i in range(len(lat) - k + 1) if all(dentro[i:i + k])), None)
+    if inicio is None:
+        return {'inicio': None, 'excursoes': []}
+    return {
+        'inicio': inicio * passo,
+        'excursoes': [(i * passo, lat[i]) for i in range(inicio, len(lat)) if not dentro[i]],
+    }
 
 
 def janela_estavel(lat, k, passo):
@@ -109,8 +165,13 @@ def analisar(caminho):
     for k in JANELAS:
         cv_janela[k] = janela_estavel(lat, k, passo)
 
+    regime_mediana = mediana(lat[corte:])
+    persistente = entrada_persistente(lat, regime_mediana, passo)
+
     return {
         'cvJanela': cv_janela,
+        'regimeMediana': regime_mediana,
+        'persistente': persistente,
         'framework': caminho.replace('\\', '/').split('/')[-1].replace('.json', ''),
         'passo': passo,
         'primeiro': lat[0],
@@ -188,6 +249,45 @@ def main(padroes):
         pior = max(adotados)
         print('Par adotado (k=%d, CV < %.0f%%): pior caso %d s.'
               % (K_ADOTADO, CV_MAX * 100, pior))
+
+    # Terceira definição, ao lado das duas anteriores. Ver o docstring: é posterior aos dados
+    # de 19/10 e não está pré-registrada.
+    print()
+    print('Entrada em regime pelas TRÊS definições (sem substituir nenhuma):')
+    print('  (1) CV < %.0f%% em k=%d intervalos      (2) 1º intervalo a ±%.0f%% da MÉDIA da cauda'
+          % (CV_MAX * 100, K_ADOTADO, TOL * 100))
+    print('  (3) %d intervalos consecutivos a ±%.0f%% da MEDIANA da cauda'
+          % (K_PERSISTENCIA, TOL * 100))
+    print()
+    print('%-12s %9s %9s %9s %9s %s'
+          % ('framework', '(1) CV', '(2) média', '(3) mediana', 'regime(3)', 'excursões após a entrada (3)'))
+    print('%-12s %9s %9s %9s %9s %s'
+          % ('-' * 12, '-' * 9, '-' * 9, '-' * 9, '-' * 9, '-' * 28))
+    for a in linhas:
+        j = a['cvJanela'][K_ADOTADO]['inicio']
+        pe = a['persistente']
+        exc = pe['excursoes']
+        if not exc:
+            txt = 'nenhuma'
+        else:
+            instantes = ', '.join('%d s (%.1f ms)' % (t, v) for t, v in exc[:4])
+            txt = '%d: %s%s' % (len(exc), instantes, ', ...' if len(exc) > 4 else '')
+        print('%-12s %9s %9s %9s %8.2fms %s'
+              % (a['framework'],
+                 'n/a' if j is None else '%d s' % j,
+                 'n/a' if a['entradaSegundos'] is None else '%d s' % a['entradaSegundos'],
+                 'n/a' if pe['inicio'] is None else '%d s' % pe['inicio'],
+                 a['regimeMediana'], txt))
+
+    def pior_de(valores):
+        v = [x for x in valores if x is not None]
+        return 'não atingido' if len(v) < len(valores) or not v else '%d s' % max(v)
+
+    print('%-12s %9s %9s %9s'
+          % ('PIOR CASO',
+             pior_de([a['cvJanela'][K_ADOTADO]['inicio'] for a in linhas]),
+             pior_de([a['entradaSegundos'] for a in linhas]),
+             pior_de([a['persistente']['inicio'] for a in linhas])))
 
     print()
     for a in linhas:
