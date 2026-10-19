@@ -1493,10 +1493,16 @@ ou sem um segundo rótulo — não é afetado por esta execução.
 
 ### 15.3.4 O que fica em aberto, e é outra coisa
 
-Se uma parada de 90 s pode ocorrer a 162 req/s, ela pode ocorrer dentro dos 300 s de medição
-de uma célula da campanha, e o `run-experiment.sh` não tem regra de descarte equivalente à que
-a seção 14.3 deu ao teste de capacidade. Convém decidir, antes da campanha, se uma célula com
-iterações descartadas é refeita ou reportada.
+Se uma parada de 90 s pode ocorrer a 162 req/s, ela cabe dentro dos 300 s de medição de uma
+célula da campanha. O aparato já prevê o caso, e a primeira versão desta seção errou ao dizer
+que não: o `run-experiment.sh` registra toda execução com erro ou iterações descartadas em
+`invalidas.csv`, o `analyze-experiment.py` as destaca como execuções a investigar antes de
+usar, e o protocolo manda investigar cada uma e repeti-la quando o erro decorrer de falha do
+ambiente. O script não descarta nem repete nada sozinho, deliberadamente.
+
+O que fica em aberto é a frequência. Se paradas como esta forem reprodutíveis a 162 req/s,
+parte das 150 células da campanha cairá em `invalidas.csv`, e o custo de calendário deixa de
+ser as ~19 h da seção 13.2. É isso que uma reexecução em máquina ociosa mediria.
 
 Sobre a causa, nada se afirma. Os logs do PostgreSQL mostram checkpoints de 270 s a cada
 5 min durante toda a sessão, inclusive nas janelas dos outros quatro tratamentos, e o
