@@ -1672,3 +1672,116 @@ dos dois critérios não o afirma. A decisão não é de aparato, e sim de méto
 3. Tornar o critério robusto a pico isolado, por mediana ou variação aparada. É alteração de
    instrumento sobre um critério citado de Georges, Buytaert e Eeckhout (2007), e exige
    justificativa no texto.
+
+**19/10/2026, mais tarde — retificação.** O parágrafo acima e a tabela de 16.1 concluíram que
+o critério de ±10% era o operativo e o do coeficiente de variação o inadequado. Está errado
+pela metade: a reanálise das séries brutas, em 16.3, mostra que **os dois** são movidos por
+eventos posteriores ao aquecimento. O de ±10% herda o defeito pela via do regime, que ele
+toma pela média da cauda. O texto acima fica como registro da leitura intermediária.
+
+### 16.3 Reanálise das séries de D.3
+
+As duas definições de 16.1 discordavam — 130 s por uma, 200 s pela outra — e 16.2 atribuiu a
+discordância à inadequação do critério do coeficiente de variação. A reanálise das séries
+brutas de `results/warmup-protocolo-v3/*.json` mostra que o diagnóstico estava incompleto.
+
+**O regime inflado.** O `analyze-warmup.py` tomava o regime pela MÉDIA dos últimos 30% dos
+intervalos. Na série do Django há uma rajada entre 490 e 530 s — 6,00, 4,94, 4,42, 6,72 e
+7,39 ms — contra platô de 3,62 ms desde o segundo intervalo. A média da cauda sobe a
+4,305 ms e a banda de ±10% vira [3,874; 4,735], **acima do platô real**. Os intervalos do
+platô ficam, portanto, fora da banda, e a entrada é reportada aos 130 s embora o tratamento
+estivesse em regime aos 10 s. Com a MEDIANA da cauda o regime é 3,630 ms, a banda
+[3,267; 3,993] contém o platô, e a entrada volta aos 10 s.
+
+**A terceira definição.** Acrescentada ao `analyze-warmup.py` ao lado das duas anteriores,
+que seguem sendo reportadas: regime pela mediana dos últimos 30%, entrada no primeiro
+intervalo a partir do qual `K_PERSISTENCIA` = 5 intervalos consecutivos ficam dentro de
+±10%, e contagem dos intervalos que saem da banda DEPOIS da entrada, com seus instantes.
+Nenhum valor adotado mudou: `WARMUP_DURATION`, `CV_MAX` e `K_ADOTADO` seguem 150 s, 2% e 5.
+
+| Framework | (1) CV, k=5 | (2) ±10% da média | (3) mediana + persistência | Excursões após a entrada, em (3) |
+|---|---:|---:|---:|---|
+| ASP.NET Core | 170 s | 10 s | **10 s** | 4: 110, 180, 300, 500 s |
+| Django | 50 s | 130 s | **10 s** | 9: 130, 140, 250, 450 s… |
+| Laravel | 100 s | 0 s | **0 s** | 4: 180, 290, 390, 480 s |
+| NestJS | 200 s | 30 s | **30 s** | 6: 150, 270, 290, 480 s… |
+| Spring Boot | 120 s | 60 s | **70 s** | 5: 150, 280, 470, 510 s… |
+| **pior caso** | **200 s** | **130 s** | **70 s** |  |
+
+**A terceira é a única reprodutível entre sessões.** Aplicadas às duas séries completas de
+cinco frameworks que existem:
+
+| Série | (1) CV | (2) ±10% da média | (3) mediana + persistência |
+|---|---:|---:|---:|
+| `warmup-aberto`, 30/09 | 90 s | 50 s | **80 s** |
+| `warmup-protocolo-v3`, 19/10 | 200 s | 130 s | **70 s** |
+
+O critério do coeficiente de variação salta de 90 para 200 s e o da média de 50 para 130 s,
+entre sessões que medem o mesmo aparato; a terceira fica em 80 e 70 s. Reprodutibilidade
+entre sessões é requisito mínimo de um critério, e só a terceira o cumpre — argumento
+independente do que motivou propô-la. Nas duas séries do Django isolado as três concordam:
+50 / 10 / 10 s em `warmup-django-pg-novo` e 60 / 10 / 10 s em `warmup-django-pg-usado`.
+
+**Duas ressalvas que limitam o que isto autoriza a dizer.** A terceira definição foi
+proposta DEPOIS de ver os dados de 19/10, e o docstring do script o declara: não é
+pré-registrada, e um critério escolhido à luz da série que ele vai julgar pede confirmação
+em série nova. E há **uma série por framework**, não mais: as excursões tabeladas acima
+podem ser características do tratamento ou acidentes de sessão, e com n = 1 não há como
+separar.
+
+**Hipótese não testada sobre a rajada.** A seção 15.3.4 registra checkpoints de 270 s a
+cada 5 min. Com o reinício do banco por tratamento, o relógio do checkpoint passa a zerar
+junto com a execução. No log do PostgreSQL, a execução do Django em `protocolo-v3` correu
+entre 19:51:50 e 20:01:49 UTC, e dentro dela há um `checkpoint starting: time` às 19:56:44
+que se completa às 20:01:14 com `write=269,385 s` — fase de escrita espalhada de cerca de
+294 s a 564 s da execução. A rajada de 490 a 530 s cai dentro dessa janela, no último sexto
+dela. Mas o platô de 3,62 ms entre 294 e 490 s cai dentro da MESMA janela, de modo que a
+coincidência não estabelece causa: o checkpoint estar ativo não produziu, por si, a rajada.
+Fica como hipótese a testar, não como explicação.
+
+**O que isto permite afirmar.** Não se afirma D.3 satisfeito. Afirma-se que os dados são
+**compatíveis** com os 150 s pelas três leituras — a mais exigente dá 200 s, e é a que a
+reanálise mostra movida por ruído posterior; as outras duas dão 130 e 70 s — e que falta uma
+segunda série por framework para que a afirmação deixe de depender de n = 1.
+
+#### Comando da segunda série
+
+Em máquina ociosa, com o PostgreSQL de pé (passo 1 da sequência do README) e sem outra
+carga:
+
+```bash
+RATE=162 DURATION=600s BUCKET_S=10 OUT=results/warmup-d3-serie2 ./scripts/verify-warmup.sh
+```
+
+`OUT` precisa ser diretório novo, sob o repositório: o k6 é conteinerizado e só enxerga a
+raiz do projeto. `BUCKET_S=10` é obrigatório — sem ele o script não marca os intervalos e
+não há série a analisar. O script reinicia o banco e recria o contêiner de cada aplicação
+por conta própria.
+
+Duração medida, e não estimada: a execução de `protocolo-v3` levou **50 min 49 s** nos
+cinco, de 16:41:29 a 17:32:18 de 19/10/2026, com 10 min 10 s por tratamento. Conferir depois
+com:
+
+```bash
+python scripts/analyze-warmup.py "results/warmup-d3-serie2/*.json"
+```
+
+### 16.4 A detecção de queda do banco, exercitada
+
+A correção de aninhamento descrita em 16 nunca havia sido exercitada, porque exige derrubar
+o banco no meio de uma medição. Foi exercitada em 19/10/2026, numa célula fora de
+`results/campaign`, depois descartada. O contêiner não tem política de reinício
+(`RestartPolicy=no`), de modo que nada o religava sozinho.
+
+Uma célula de `springboot` a 81 req/s por 60 s, com os 150 s de aquecimento, e o banco
+parado 40 s dentro da medição. Resultado: o k6 acusou VUs insuficientes, o
+`require_postgres` posterior à medição falhou, o JSON da célula foi removido, e
+`invalidas.csv` recebeu `banco_caiu_durante`. Religado o banco, a reexecução **refez** a
+célula em lugar de pulá-la, e gravou medição íntegra: p95 de 7,2 ms, 81,0 req/s obtidas,
+erro nulo, zero descartes. A guarda funciona de ponta a ponta.
+
+Duas observações do teste. O `.stats.csv` da célula **não** é removido junto com o JSON;
+não é defeito, porque a reexecução o sobrescreve, mas um diretório de campanha interrompida
+pode conter `.stats.csv` órfãos. E o rótulo `banco_caiu_durante` é gravado na coluna
+`taxa_erro` do `invalidas.csv`, que o cabeçalho sugere numérica — é a convenção já usada
+por todos os modos de falha, e quem ler o arquivo com script precisa saber.
