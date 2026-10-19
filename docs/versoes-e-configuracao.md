@@ -1448,6 +1448,58 @@ primeiro intervalo, de 594,3 ms, é onde a compilação em tempo de execução a
 dentro do que os 150 s de aquecimento descartam. A taxa de erro é nula nos cinco, como D.3
 exige.
 
-Reexecutar o `verify-warmup.sh` sob o aparato congelado fecharia a questão por medição direta,
-a cerca de uma hora de máquina. Pelas três vias acima, não é necessário, e a ressalva não
-precisa ser levada às ameaças à validade da seção 3.6.
+O `verify-warmup.sh` foi reexecutado em 19/10/2026 para fechar a questão por medição direta.
+A execução não a fechou, por motivo alheio ao rótulo: ver a seção 15.3.
+
+---
+
+## 15.3 Reexecução do aquecimento em 19/10/2026 — inconclusiva
+
+Reexecução do `verify-warmup.sh` sob o aparato congelado, com os parâmetros da seção 13 —
+162 req/s, 600 s, intervalos de 10 s —, gravada em `results/warmup-aberto-name/`. Não
+reproduz a série de 30/09 e **não decide** a questão do rótulo.
+
+| | 30/09, sem rótulo | 19/10, com rótulo |
+|---|---|---|
+| taxa de erro | nula nos cinco | nula nos cinco |
+| pior caso (k = 5, CV < 2%) | 90 s | **560 s**, no Django |
+| iterações descartadas | 121, no Spring Boot | **2.786** no Django; 83 no Spring Boot |
+| regime do Spring Boot | 2,96 ms | 4,77 ms (+62%) |
+| regime do Django | 3,70 ms | 4,39 ms (+19%) |
+| regime do ASP.NET Core | 2,65 ms | 2,96 ms (+12%) |
+
+### 15.3.1 O que ocorreu
+
+Entre 110 s e 199 s o Django saturou: média por intervalo de até 4.183,9 ms, p95 de até
+11.270,7 ms e 2.786 iterações nunca iniciadas no instante previsto — 2,9% das 97.201
+esperadas. Pela condição (iii) da seção 3.4.2, descarte de iterações é saturação operacional.
+Isso a 162 req/s, que são 21% dos 775 req/s de capacidade medidos para o Django na seção 14.1.
+Antes e depois da excursão a série dele fica entre 3,5 e 4,5 ms.
+
+### 15.3.2 A execução não é comparável à de 30/09
+
+A latência de regime subiu em quatro dos cinco tratamentos, o Spring Boot em 62%. Isso indica
+carga ambiente maior nesta sessão do que naquela: a medição foi disparada de uma sessão de
+trabalho que seguia ativa na mesma máquina, condição que a de 30/09 não tinha. É exatamente a
+ameaça que a seção 3.6.1 da monografia descreve. Uma reconfirmação válida exige máquina
+ociosa, e esta execução não a substitui.
+
+### 15.3.3 O rótulo `name` não é candidato a causa
+
+O rótulo reduz a cardinalidade de séries e, com ela, a sobrecarga do gerador; uma parada de
+quatro segundos no tratamento não vem daí. O argumento de mecanismo da seção 15.2 — a
+sub-métrica `http_req_duration{bucket:N}` agrega sobre todas as requisições do intervalo, com
+ou sem um segundo rótulo — não é afetado por esta execução.
+
+### 15.3.4 O que fica em aberto, e é outra coisa
+
+Se uma parada de 90 s pode ocorrer a 162 req/s, ela pode ocorrer dentro dos 300 s de medição
+de uma célula da campanha, e o `run-experiment.sh` não tem regra de descarte equivalente à que
+a seção 14.3 deu ao teste de capacidade. Convém decidir, antes da campanha, se uma célula com
+iterações descartadas é refeita ou reportada.
+
+Sobre a causa, nada se afirma. Os logs do PostgreSQL mostram checkpoints de 270 s a cada
+5 min durante toda a sessão, inclusive nas janelas dos outros quatro tratamentos, e o
+`parametros.txt` registra apenas o início da execução inteira, não o de cada tratamento, de
+modo que a série do Django não pode ser alinhada ao log com precisão suficiente para imputar
+a excursão a um checkpoint. Registrar a lacuna é mais útil que escolher uma explicação.
