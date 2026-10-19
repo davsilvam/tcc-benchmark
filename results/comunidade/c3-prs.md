@@ -115,3 +115,8 @@ Duas saídas, ambas defensáveis e ambas já calculadas acima: declarar na seç�
 indicador capta contribuição *revisada*, caso em que o zero é achado a discutir no capítulo de
 resultados; ou tratar a exigência de revisão como eixo da análise de sensibilidade da seção
 3.5.4, ao lado dos demais.
+
+**19/10/2026 — a segunda saída foi adotada.** O terceiro eixo da análise de sensibilidade da
+seção 3.5.4 passou a recalcular o modelo suprimindo a exigência de revisão no filtro de pull
+requests, ao lado da variante que troca os fechados pelos em aberto. A escolha deixa de estar
+pendente; o parágrafo acima fica como registro das duas alternativas que se consideraram.
