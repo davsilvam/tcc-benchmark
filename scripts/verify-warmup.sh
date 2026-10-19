@@ -52,6 +52,14 @@ falhas=()
 for fw in "${FRAMEWORKS[@]}"; do
   echo "=== $fw — $RATE req/s por $DURATION, intervalos de ${BUCKET_S}s ==="
 
+  # O banco é reiniciado antes de cada tratamento, como na campanha: o que se verifica aqui
+  # é o aquecimento NAS CONDIÇÕES em que o run-experiment.sh mede. Ver restart_postgres em
+  # common.sh e a seção 15.3.6 do doc de versões.
+  if ! restart_postgres; then
+    falhas+=("$fw: o banco não reiniciou")
+    continue
+  fi
+
   reset_db
   app_up "$fw"
   if ! wait_health "$fw"; then
