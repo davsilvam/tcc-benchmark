@@ -1509,3 +1509,50 @@ Sobre a causa, nada se afirma. Os logs do PostgreSQL mostram checkpoints de 270 
 `parametros.txt` registra apenas o início da execução inteira, não o de cada tratamento, de
 modo que a série do Django não pode ser alinhada ao log com precisão suficiente para imputar
 a excursão a um checkpoint. Registrar a lacuna é mais útil que escolher uma explicação.
+
+### 15.3.5 Repetição só do Django — a parada não reaparece
+
+Repetição do `verify-warmup.sh` apenas para o Django, mesmos parâmetros, em
+`results/warmup-django-ocioso/`. **A parada de 90 s não se reproduziu:** zero iterações
+descartadas, 97.201 requisições completas, taxa de erro nula. A excursão de 15.3.1 era do
+ambiente, e não do tratamento.
+
+O período de aquecimento, porém, segue sem ficar estabelecido. Entre as duas execuções sem
+descarte:
+
+| | 30/09 | 19/10 |
+|---|---:|---:|
+| 1º intervalo | 10,19 ms | 19,04 ms |
+| média de 0 a 100 s | 4,30 ms | 6,43 ms |
+| média de 100 a 200 s | 3,74 ms | 4,54 ms |
+| média de 400 a 600 s | 3,70 ms | 3,77 ms |
+| entrada sustentada na banda de ±10% | 10 s | **290 s** |
+| pior caso (k = 5, CV < 2%) | 50 s | **410 s** |
+
+As duas convergem para o mesmo regime — 3,69 e 3,83 ms, diferença de 3,8% — mas a de 19/10
+leva de 300 a 400 s para chegar lá. O ponto de chegada é o mesmo; o tempo de chegada, não.
+
+**Esta execução também não correu em máquina controlada.** Dois contêineres de outro projeto,
+`veredaedu-postgres-test` e `veredaedu-localstack-test`, estavam de pé durante toda a medição.
+Subiram 13 min antes dela — 17:50:14 e 17:50:35 UTC, contra início às 18:03:37 UTC —, de modo
+que a partida deles não cai na janela, mas o que executaram durante ela não é observável a
+posteriori.
+
+**E o teste de validade adotado era inadequado.** Fixou-se, antes de medir, o critério de
+comparar a latência de regime com os 3,70 ms de 30/09; ela passou, com 3,83 ms. Mas o regime
+se calcula sobre os últimos 300 s, isto é, depois de qualquer interferência inicial — e os
+primeiros intervalos são justamente o que determina o período de aquecimento. O critério não
+podia detectar a contaminação da parte da série que decide a questão. Um teste útil olharia os
+primeiros intervalos e registraria os contêineres de pé antes e depois.
+
+**Uma hipótese a testar, com consequência para a campanha.** O contêiner do PostgreSQL estava
+de pé havia cinco horas, com 20 GB de WAL escritos e 58 checkpoints temporizados, cada um
+espalhando escrita por 270 s. A execução de 30/09 partiu de instância bem mais nova. Como o
+Apêndice E mantém o banco de pé ao longo de toda a campanha de propósito, recriando apenas o
+contêiner da aplicação, a condição desta execução é a das células da campanha, e a de 30/09 é
+a da primeira delas. Se a pressão de escrita acumulada eleva o tempo de aquecimento, os 150 s
+foram calibrados na condição favorável.
+
+Nada disso está estabelecido. Separar as duas coisas pede duas execuções do Django em máquina
+sem outra carga: uma com o PostgreSQL recém-subido e em repouso, outra imediatamente após uma
+célula de escrita intensa. Cerca de 25 min.
