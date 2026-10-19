@@ -1400,16 +1400,54 @@ registra o commit `72134db` — o último a alterar o `verify-warmup.sh`. Recomp
 19/10/2026 pelo `analyze-warmup.py`: taxa de erro nula nos cinco e regime aos 90 s no pior
 caso sob (k = 5, CV < 2%), dentro dos 150 s adotados.
 
-### 15.2 Ressalva sobre D.3
+### 15.2 O rótulo `name` e D.3
 
-O `k6/load-test.js` mudou **depois** daquela execução, em `8ce8612` (30/09/2026, 18h01), que
-passou a agrupar as URLs nas métricas do k6 com o rótulo `name`. A série de aquecimento foi,
-portanto, coletada sem o rótulo, enquanto a campanha roda com ele.
+O `k6/load-test.js` mudou **depois** da execução que estabeleceu D.3, em `8ce8612`
+(30/09/2026, 18h01), que passou a agrupar as URLs nas métricas do k6 com o rótulo `name`. A
+série de aquecimento foi coletada sem o rótulo; a campanha roda com ele. A pergunta — se os
+150 s seguem válidos — se responde sem reexecução, por três vias.
 
-O efeito do rótulo foi investigado à parte, em `results/capacity-nestjs-z60-name/` contra
-`results/capacity-nestjs-z60/`. As duas execuções devolvem 1.000 e 1.350 req/s para o NestJS
-sob [Z] = 60 s, mas com três repetições cada e a dispersão conhecida do tratamento a
-comparação **não isola** o efeito do rótulo da variação entre sessões. Reexecutar o
-`verify-warmup.sh` sob o aparato congelado encerraria a ressalva, a um custo de cerca de uma
-hora de máquina. Enquanto isso não for feito, D.3 está verificado sob o `load-test.js`
-anterior ao rótulo.
+**O que D.3 mede não depende do rótulo.** A série por intervalo sai da sub-métrica
+`http_req_duration{bucket:N}`, materializada pelos limiares de `bucketThresholds()` e lida em
+`handleSummary`. O conjunto de amostras de `{bucket:N}` é o mesmo com ou sem um segundo
+rótulo em cada requisição, e a média e o p95 do intervalo não mudam por isso. O rótulo altera
+quantas séries o k6 materializa, não como a latência do intervalo é agregada.
+
+**A cardinalidade não contaminou aquela execução.** O risco que o rótulo evita é indireto: as
+séries acumuladas consomem memória do gerador, que roda na mesma máquina, e suas pausas de
+coleta de lixo entrariam na latência reportada. O efeito cresceria ao longo da execução,
+porque a cardinalidade cresce — da ordem de 29 mil URLs únicas ao fim dos 600 s, sob o esquema
+antigo de séries. A série não mostra isso. Média por terço, descartados os 100 s de entrada:
+
+| Framework | 100–266 s | 266–433 s | 433–600 s | deriva | p95 do 1º | p95 do 3º |
+|---|---:|---:|---:|---:|---:|---:|
+| ASP.NET Core | 2,61 ms | 2,62 ms | 2,69 ms | +3,2% | 5,41 ms | 5,58 ms |
+| Django | 3,76 ms | 3,65 ms | 3,71 ms | −1,3% | 6,42 ms | 6,22 ms |
+| Laravel | 5,81 ms | 5,93 ms | 5,90 ms | +1,5% | 8,67 ms | 8,85 ms |
+| NestJS | 2,85 ms | 2,75 ms | 2,83 ms | −0,5% | 5,51 ms | 5,47 ms |
+| Spring Boot | 2,59 ms | 3,49 ms | 2,56 ms | −1,3% | 5,23 ms | 5,22 ms |
+
+O terço final é o de cardinalidade máxima, e é onde a contaminação apareceria. Não aparece: a
+deriva fica dentro de ±3,2% e o p95 por terço acompanha. O terço do meio do Spring Boot
+carrega o pico isolado de 16 ms do intervalo 33, já descrito em 13.3.
+
+**A direção do risco é favorável.** Aquela execução correu na condição de *mais* séries, a de
+maior sobrecarga do gerador. A campanha corre com o rótulo, com cinco nomes de série em lugar
+de dezenas de milhares. Um período de aquecimento que bastou sob o gerador mais pesado basta
+sob o mais leve.
+
+A comparação que havia sido feita à parte — `results/capacity-nestjs-z60-name/` contra
+`results/capacity-nestjs-z60/`, 1.000 contra 1.350 req/s — **não** serve para decidir isto:
+são três repetições cada, sob [Z] = 60 s, e a diferença não se separa da dispersão do NestJS.
+Ela mede capacidade, cujo critério é o p95 por patamar e é sensível a evento transitório, e
+não estabilização da média, que é o que D.3 verifica.
+
+Registra-se um detalhe da mesma execução: o Spring Boot completou 97.080 requisições das
+97.201 dos demais, com 121 iterações descartadas. O arquivo guarda apenas o total, e o
+primeiro intervalo, de 594,3 ms, é onde a compilação em tempo de execução as produz — ou seja,
+dentro do que os 150 s de aquecimento descartam. A taxa de erro é nula nos cinco, como D.3
+exige.
+
+Reexecutar o `verify-warmup.sh` sob o aparato congelado fecharia a questão por medição direta,
+a cerca de uma hora de máquina. Pelas três vias acima, não é necessário, e a ressalva não
+precisa ser levada às ameaças à validade da seção 3.6.
