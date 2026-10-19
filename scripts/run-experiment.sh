@@ -13,12 +13,13 @@
 #     sorteia a ordem dos frameworks (semente ORDER_SEED e n; ordem gravada em ordem.csv)
 #     para cada framework, na ordem sorteada
 #       para cada taxa de RATES
-#         1. restaura a base ao estado semente
-#         2. recria APENAS o contêiner da aplicação (o PostgreSQL permanece ativo)
-#         3. aguarda /api/health
-#         4. aquecimento na MESMA taxa, por WARMUP_DURATION — dados descartados
-#         5. medição por DURATION, com coleta paralela de docker stats
-#         6. remove o contêiner da aplicação
+#         1. reinicia o processo do PostgreSQL e aguarda prontidão
+#         2. restaura a base ao estado semente
+#         3. recria APENAS o contêiner da aplicação
+#         4. aguarda /api/health
+#         5. aquecimento na MESMA taxa, por WARMUP_DURATION — dados descartados
+#         6. medição por DURATION, com coleta paralela de docker stats
+#         7. remove o contêiner da aplicação
 # A repetição n de todos os tratamentos termina antes do início da n + 1, de modo que
 # variações lentas do ambiente — aquecimento térmico, atividade do sistema hospedeiro — se
 # distribuam entre os frameworks em vez de recair sobre um só.
@@ -98,6 +99,15 @@ for rep in $(seq 1 "$REPS"); do
       if ! require_postgres; then
         echo "$tag,banco_indisponivel," >> "$OUT/invalidas.csv"
         echo "    ATENÇÃO: banco indisponível; execução não realizada"
+        continue
+      fi
+
+      # O processo do banco é reiniciado a cada execução, e não apenas os dados restaurados:
+      # ver restart_postgres em common.sh e a seção 15.3.6 do doc de versões. Custa cerca de
+      # cinco segundos por célula.
+      if ! restart_postgres; then
+        echo "$tag,banco_nao_reiniciou," >> "$OUT/invalidas.csv"
+        echo "    ATENÇÃO: o banco não reiniciou; execução não realizada"
         continue
       fi
 

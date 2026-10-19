@@ -47,6 +47,35 @@ require_postgres() {
   fi
 }
 
+# Reinicia o PROCESSO do banco, e não apenas restaura os dados.
+#
+# O reset_db devolve o conteúdo das tabelas ao estado semente, mas não desfaz o estado que o
+# processo acumula ao longo de horas. Em 19/10/2026 mediu-se a consequência: com o contêiner
+# de pé havia cinco horas, o Django levava de 290 a 560 s para estabilizar a 162 req/s,
+# contra 50 s com o processo recém-reiniciado, e numa das execuções saturou por 90 s com
+# 2.786 iterações descartadas. Uma célula de escrita intensa não degrada; horas de acúmulo
+# degradam. Ver a seção 15.3.6 de docs/versoes-e-configuracao.md.
+#
+# E o Apêndice E já exige que cada execução parta do mesmo estado de processo e de memória;
+# o banco era o único componente isento dessa regra.
+#
+# O reinício PRESERVA o esquema: o volume persiste e o entrypoint do postgres só executa os
+# scripts de inicialização em diretório de dados vazio. Usa-se `restart`, e não `down`/`up`,
+# que destruiria a base (seção 5.5).
+restart_postgres() {
+  local pg="${PG_CONTAINER:-tcc-postgres}" limite="${1:-60}"
+  if ! docker restart "$pg" >/dev/null 2>&1; then
+    echo "ERRO: falha ao reiniciar o contêiner $pg." >&2
+    return 1
+  fi
+  for _ in $(seq 1 "$limite"); do
+    if docker exec "$pg" pg_isready -U bench -d tccbench >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  echo "ERRO: $pg não voltou a aceitar conexões em $limite s." >&2
+  return 1
+}
+
 wait_health() {
   local fw="$1" limite="${2:-180}"
   for _ in $(seq 1 "$limite"); do
