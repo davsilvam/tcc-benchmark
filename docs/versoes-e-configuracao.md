@@ -1313,6 +1313,42 @@ patamar que satisfaz as condições — daria valores bem mais altos, até 2.475
 repetição cujo valor adotado é 1.500. A distância entre as duas leituras mede o quanto a
 capacidade dele é esporádica, e é mais um argumento para a leitura conservadora adotada.
 
+### 14.6.1 Deriva de sessão: não há
+
+Acrescentado em 21/10/2026, depois que a seção 15.3.6 mediu que o tempo de vida do processo
+do PostgreSQL degrada a latência de regime. O teste desta seção correu cerca de 3 h 45 com o
+contêiner do banco ativo do começo ao fim. Se a mesma degradação o atingisse, as células
+tardias teriam capacidade sistematicamente menor e o [C_min] seria artefato da ordem de
+execução.
+
+O teste não exige medição nova. Cada uma das 25 células tem uma posição na sessão, dada por
+(repetição − 1) × 5 + posição na rodada, que o `ordem.csv` registra; a capacidade de cada
+uma é comparada à **mediana do próprio framework**, o que remove a diferença entre
+tratamentos e deixa só o desvio atribuível à sessão. Sobre esses desvios calculam-se a
+inclinação por célula e a correlação de Pearson contra o índice. As capacidades saem do
+`analyze-capacity.py`, e não são recalculadas.
+
+```bash
+python scripts/analyze-capacity-deriva.py --dir results/capacity
+```
+
+| | |
+|---|---|
+| células | 25 |
+| inclinação | **+0,202% por célula** |
+| correlação de Pearson | **r = +0,132** |
+
+Deriva por envelhecimento preveria inclinação negativa e correlação apreciável. A inclinação
+observada é positiva e desprezível. Os dados da seção 14 não mostram deriva de sessão, o que
+é coerente com a ausência de efeito de rodada que 12.3 reportou para os dados da seção 12.
+
+**O limite do teste.** Com n = 25 e a dispersão entre repetições do mesmo framework sendo
+grande — o ASP.NET Core vai de 1.500 a 2.325 req/s —, o teste tem pouca potência: descarta
+deriva grande, e não deriva pequena. Convém também registrar que a capacidade pode ser menos
+sensível ao estado do banco que a latência de regime, por ser medida onde o limite do próprio
+sistema domina, de modo que a ausência de deriva aqui não contradiz a degradação medida em
+15.3.6 a 162 req/s.
+
 ### 14.7 A regra de resumo, e uma divergência entre texto e código
 
 O valor-resumo de cada framework sai do `resumir_patamares`, em
@@ -1944,3 +1980,103 @@ e 854 ms —, numa razão de 2,8 entre o menor e o maior, sem explicação. E qu
 Laravel voltou a 5,88 ms nesta série, depois dos 6,95 ms de 16.5, o que enfraquece a leitura
 de deriva que aquela seção levantou: são 5,85, 5,88, 7,01 e 5,88 ms nas quatro sessões, e o
 valor alto é isolado.
+
+---
+
+## 17. D.3: conclusão
+
+Decidido em 21/10/2026, depois de 16.6: para de se ajustar o critério de aquecimento. Não há
+terceira correção. A conclusão de D.3 passa a se apoiar em evidência direta, e os critérios
+de banda ficam **reportados**, sem servir de teste de suficiência.
+
+### 17.1 Evidência direta
+
+Vinte execuções de framework, cinco tratamentos em quatro sessões, por
+`scripts/analyze-d3.py`. As grandezas não dependem de banda nem de supor que os últimos 30%
+da série representem o estado estacionário:
+
+```bash
+python scripts/analyze-d3.py
+```
+
+O **corpo** é a mediana dos intervalos 1 a 41, de 10 s a 410 s: exclui o primeiro intervalo,
+que é o transiente a medir, e os últimos 30%, que 16.3, 16.5 e 16.6 mostraram sujeitos a
+rajada tardia, pico isolado e elevação da cauda sobre o corpo.
+
+| Sessão | Framework | Erro | 1º (ms) | 1º / corpo | Acima de 1,5× | 1ª janela / resto |
+|---|---|---:|---:|---:|---:|---:|
+| 30/09 | ASP.NET Core | 0,0000% | 87,0 | 33,6× | 0 | 1,006 |
+| 30/09 | Django | 0,0000% | 10,2 | 2,8× | 0 | 0,995 |
+| 30/09 | Laravel | 0,0000% | 6,5 | 1,1× | 0 | 0,974 |
+| 30/09 | NestJS | 0,0000% | 3,3 | 1,2× | 0 | 1,005 |
+| 30/09 | Spring Boot | 0,0000% | 594,3 | 225,5× | 2 | 0,937 |
+| 19/10 | ASP.NET Core | 0,0000% | 109,7 | 39,1× | 1 | 0,981 |
+| 19/10 | Django | 0,0000% | 11,4 | 3,2× | 3 | 0,987 |
+| 19/10 | Laravel | 0,0000% | 6,1 | 1,1× | 0 | 0,964 |
+| 19/10 | NestJS | 0,0000% | 3,4 | 1,2× | 0 | 0,969 |
+| 19/10 | Spring Boot | 0,0000% | 331,7 | 124,8× | 2 | 1,038 |
+| 21/10 a | ASP.NET Core | 0,0000% | 105,2 | 35,5× | 0 | 0,960 |
+| 21/10 a | Django | 0,0000% | 15,3 | 3,5× | 1 | 0,994 |
+| 21/10 a | Laravel | 0,0000% | 8,6 | 1,2× | 1 | 1,120 |
+| 21/10 a | NestJS | 0,0000% | 3,9 | 1,1× | 0 | 1,007 |
+| 21/10 a | Spring Boot | 0,0000% | 310,4 | 108,1× | 4 | 1,063 |
+| 21/10 b | ASP.NET Core | 0,0000% | 108,8 | 39,6× | 0 | 0,978 |
+| 21/10 b | Django | 0,0000% | 19,5 | 5,2× | 0 | 0,967 |
+| 21/10 b | Laravel | 0,0000% | 6,8 | 1,2× | 0 | 0,989 |
+| 21/10 b | NestJS | 0,0000% | 3,3 | 1,2× | 0 | 1,005 |
+| 21/10 b | Spring Boot | 0,0000% | 854,2 | 307,0× | 5 | 1,051 |
+
+Agregado: **taxa de erro nula nas 20 execuções**; primeiro intervalo de 1,1× a 307× o corpo;
+de 0 a 5 intervalos acima de 1,5× o corpo do segundo em diante; primeiro minuto da janela de
+medição sobre o resto dela entre **0,937 e 1,120**.
+
+Esta última coluna é a que fala diretamente sobre a suficiência dos 150 s: compara a mediana
+de [150, 210) s com a de [210, 450) s, isto é, o primeiro minuto medido contra o resto da
+janela. Se o aquecimento não bastasse, o primeiro minuto viria sistematicamente mais alto.
+Nas 20 execuções a razão fica a menos de 7% de 1, e em 12 delas abaixo de 1.
+
+### 17.2 Os critérios de banda, reportados
+
+| Definição | 30/09 | 19/10 | 21/10 a | 21/10 b | Natureza |
+|---|---:|---:|---:|---:|---|
+| (1) CV < 2% em k = 5 | 90 s | 200 s | 550 s | 370 s | da monografia, seção 3.4.3 |
+| (2) ±10% da média da cauda | 50 s | 130 s | não entrou | 110 s | da monografia, seção 3.4.3 |
+| (3) mediana + persistência | 80 s | 70 s | 220 s | 40 s | **post hoc**, 19/10 |
+| (3) + piso de ±0,5 ms | 40 s | 60 s | 70 s | 40 s | **post hoc**, 21/10 |
+
+As definições (1) e (2) são as do texto e ficam reportadas. As definições (3) e (3) com piso
+foram propostas **depois** de ver os dados que julgam, **não são pré-registradas**, e os
+docstrings do `analyze-warmup.py` o declaram. A primeira delas caiu na série seguinte à que a
+motivou, passando de 80 e 70 s para 220 s; a segunda passa no valor e falha na interpretação,
+pelo caso do Spring Boot em 16.6.
+
+**Nenhum critério de banda relativa sobre os últimos 30% da série se mostrou estável entre
+sessões neste aparato.** A causa está em 16.5 e 16.6: com latência de regime entre 2,4 e
+7,0 ms e variação própria da medição entre 0,1 e 0,5 ms, a tolerância relativa desce abaixo
+do ruído; e o regime tomado da cauda não representa o estado estacionário de forma confiável.
+
+Não se afirma que os critérios de banda foram satisfeitos.
+
+### 17.3 D.3 é sustentado por
+
+1. **Taxa de erro nula** nas 20 execuções, em quatro sessões, nos cinco tratamentos.
+2. **Transiente confinado ao primeiro intervalo de 10 s**, contra os 150 s de aquecimento
+   adotados — quinze vezes a duração do único transiente observado. Do segundo intervalo em
+   diante não há, em nenhuma das 20 execuções, transiente de ordem de grandeza; o que resta
+   são de 0 a 5 intervalos acima de 1,5× o corpo, isolados.
+
+A isso se soma, como verificação independente, a razão entre o primeiro minuto da janela de
+medição e o resto dela, entre 0,937 e 1,120.
+
+### 17.4 Dois achados sem explicação
+
+**O primeiro intervalo do Spring Boot varia 2,8× entre sessões:** 594, 332, 310 e 854 ms, nas
+quatro. É o transiente de compilação em tempo de execução, e a razão entre o menor e o maior
+não tem explicação registrada. Não afeta a conclusão — nas quatro ele está extinto no
+segundo intervalo —, mas afeta qualquer tentativa de prever a duração do aquecimento a
+partir de uma execução só.
+
+**O regime do Laravel:** 5,85, 5,88, 7,01 e 5,88 ms. A seção 16.5 levantou a leitura de que o
+regime dele estaria derivando, com base nos três primeiros valores; a quarta sessão desfaz a
+leitura. O valor de 7,01 ms é isolado, e não tendência. Fica registrado porque a hipótese de
+deriva chegou a ser escrita.
