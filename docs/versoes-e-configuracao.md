@@ -1867,3 +1867,80 @@ ao critério quando o regime se aproxima da resolução da medição. Seria, no 
 segunda definição proposta depois de ver os dados, e a primeira já caiu na série seguinte.
 Se for adotada, deve ser em texto, declarada como tal, e verificada em série nova — não
 nestas três.
+
+### 16.6 Série de verificação do piso (21/10/2026): passa no número, falha no sentido
+
+O piso absoluto na tolerância — banda igual a max(±10%, ±0,5 ms) — foi adotado na terceira
+definição e verificado em série nova, `results/warmup-d3-serie3/`, na mesma condição limpa:
+nenhum contêiner de outro projeto, 0,00% de CPU na linha de base.
+
+Sobre as três séries que motivaram o piso, ele leva a terceira definição de 80, 70 e 220 s
+para 40, 60 e 70 s. Na série de verificação, que não o motivou, o pior caso é de **40 s**.
+
+| Framework | (1) CV, k=5 | (2) ±10% da média | (3) com piso | Excursões após a entrada |
+|---|---:|---:|---:|---:|
+| ASP.NET Core | 70 s | 10 s | 10 s | 3 |
+| Django | 60 s | 20 s | 20 s | 3 |
+| Laravel | 60 s | 10 s | 10 s | 1 |
+| NestJS | 90 s | 10 s | **40 s** | 2 |
+| Spring Boot | 370 s | 110 s | 20 s | **31** |
+| **pior caso** | 370 s | 110 s | **40 s** |  |
+
+**O número passa.** Quarenta segundos, contra os 150 s adotados, por um critério que não foi
+ajustado nesta série. Era o desfecho anunciado como favorável antes de executar.
+
+**Mas a entrada do Spring Boot não significa o que diz.** As 31 excursões posteriores — de 59
+intervalos — denunciam o problema. A mediana da cauda dele é de 3,283 ms e a do corpo, dos
+intervalos 1 a 41, é de 2,782 ms: a cauda está **acima** do corpo, puxada por picos aos 470,
+480, 530, 540 e 560 s, de 4,0 a 4,9 ms. A banda que sai dessa cauda é [2,783; 3,783] e fica,
+portanto, acima do corpo da série: **25 dos 59 intervalos caem abaixo dela**. A entrada aos
+20 s vem de um trecho de cinco intervalos que por acaso cai na banda, entre 20 e 60 s, antes
+de a série descer para 2,6 a 2,8 ms e sair. Não descreve estabilização.
+
+**O piso mudou o problema de lugar, não o resolveu.** Em 16.5 a cauda do Django estava
+contaminada por rajada e inflava o regime; aqui a cauda do Spring Boot está elevada em
+relação ao corpo e a banda sobe junto. A raiz é anterior à tolerância: as três definições
+tomam o regime dos últimos 30% da série e supõem que esse trecho representa o estado
+estacionário. As quatro séries mostram que ele não representa de forma confiável — por rajada
+tardia, por pico isolado ou por elevação da cauda sobre o corpo.
+
+Corrigir isso seria a terceira correção post hoc do mesmo critério. A primeira caiu na série
+seguinte à que a motivou; a segunda passa no valor e falha na interpretação. Não se propõe
+uma terceira.
+
+#### O que as quatro séries estabelecem sem critério de banda
+
+Vinte execuções de framework, cinco tratamentos em quatro sessões. Lidas sem nenhuma banda:
+
+| Afirmação | Evidência |
+|---|---|
+| taxa de erro nula | 0,0000% nas **20** execuções |
+| o transiente está no 1º intervalo | 1º intervalo entre 1,0× e 303× a mediana do corpo |
+| e só nele | do 2º intervalo em diante, 0 a 5 intervalos acima de 1,5× a mediana do corpo |
+
+Por tratamento, o primeiro intervalo sobre a mediana do corpo: Spring Boot de 107× a 303×,
+ASP.NET Core de 33× a 40×, Django de 2,8× a 5,2×, Laravel e NestJS de 1,0× a 1,2× — estes
+dois últimos chegam quentes. Em nenhuma das 20 execuções há transiente de ordem de grandeza
+depois do primeiro intervalo de 10 s.
+
+Os 150 s adotados são, por essa leitura, quinze vezes a duração do único transiente
+observado. A folga não depende de qual das três definições se prefira, e é o que há de mais
+robusto no conjunto.
+
+#### Recomendação
+
+Declarar a limitação em lugar de consertar o critério pela terceira vez. Em concreto: que a
+seção 3.4.3 registre que o critério do coeficiente de variação de Georges, Buytaert e
+Eeckhout (2007) é reportado, mas que, com latência de regime entre 2,4 e 7,0 ms e variação
+própria da medição da ordem de 0,1 a 0,5 ms, nenhum critério de banda relativa sobre os
+últimos 30% da série se mostrou estável entre sessões neste aparato; e que D.3 se sustente no
+que as quatro séries afirmam de modo consistente — taxa de erro nula e transiente confinado
+ao primeiro intervalo de 10 s, contra 150 s de aquecimento.
+
+Isso é decisão de texto, não de aparato. **A tag `protocolo-v3` segue não emitida.**
+
+Fica registrado que o primeiro intervalo do Spring Boot variou entre sessões — 594, 332, 310
+e 854 ms —, numa razão de 2,8 entre o menor e o maior, sem explicação. E que o regime do
+Laravel voltou a 5,88 ms nesta série, depois dos 6,95 ms de 16.5, o que enfraquece a leitura
+de deriva que aquela seção levantou: são 5,85, 5,88, 7,01 e 5,88 ms nas quatro sessões, e o
+valor alto é isolado.
