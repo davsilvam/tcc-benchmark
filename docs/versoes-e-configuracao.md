@@ -2080,3 +2080,105 @@ partir de uma execução só.
 regime dele estaria derivando, com base nos três primeiros valores; a quarta sessão desfaz a
 leitura. O valor de 7,01 ms é isolado, e não tendência. Fica registrado porque a hipótese de
 deriva chegou a ser escrita.
+
+---
+
+## 18. A campanha: comando, duração e conferência
+
+Escrito em 21/10/2026, com o aparato congelado em `protocolo-v3`. Nada aqui foi executado.
+
+### 18.1 O comando
+
+Depois dos passos 1 a 4 da sequência do README — banco de pé, framework no ar, critérios de
+aceite, teste de capacidade:
+
+```bash
+RATES="81 162 243" DURATION=300s REPS=10 OUT=results/campaign ./scripts/run-experiment.sh
+```
+
+As taxas saem do teste de capacidade da seção 14 e foram reconferidas em 21/10/2026 com
+`python scripts/analyze-capacity.py --dir results/capacity --p95-max 100`, que devolve
+[C_min] = 325 req/s (Laravel) e os níveis 81, 162 e 243 req/s. `DURATION` e `REPS` são os
+valores de [D] e de repetições da seção 14.9. O `WARMUP_DURATION` não é passado: fica nos
+150 s que o script traz por padrão.
+
+**Uma divergência de semente, a confirmar.** O `ORDER_SEED` do `run-experiment.sh` vale
+20260922 por padrão, enquanto o teste de capacidade correu com 20260925. São sorteios
+independentes, de dois experimentos distintos, e nada no protocolo exige que coincidam — a
+intercalação da seção 3.4.4 pede ordem sorteada por rodada, não a MESMA ordem do teste de
+capacidade. Fica registrado para que a escolha seja deliberada e não acidental.
+
+### 18.2 Duração
+
+150 células: 5 frameworks × 3 níveis × 10 repetições.
+
+| Componente | Por célula | Total |
+|---|---:|---:|
+| aquecimento | 150 s | 6 h 15 min |
+| medição | 300 s | 12 h 30 min |
+| reinício do banco e prontidão | ~5 s | ~12 min |
+| `reset_db`, recriação do contêiner, `/api/health` | ~5 s | ~13 min |
+| **total** | **~460 s** | **~19 h 10 min** |
+
+A sobrecarga por célula foi medida, e não estimada: nas execuções de aquecimento de 19 e
+21/10, o intervalo entre os JSONs de dois tratamentos consecutivos ficou em 607 a 610 s
+contra 600 s de carga, isto é, cerca de 10 s de preparo por célula com as imagens já
+construídas.
+
+Convém rodar com as imagens já construídas. A primeira construção de cada uma não entra nessa
+conta.
+
+### 18.3 Retomada
+
+A retomada é **por célula**, e o teste é a existência do JSON de resultado. Uma campanha
+interrompida continua com o MESMO comando, sem argumento extra:
+
+```bash
+RATES="81 162 243" DURATION=300s REPS=10 OUT=results/campaign ./scripts/run-experiment.sh
+```
+
+As células já medidas são anunciadas como "já medido, pulando" e a ordem sorteada não muda,
+porque o `ordem.csv` é preservado e só recebe as rodadas que ainda não constam dele. Uma
+célula cujo banco caiu durante a medição teve o JSON removido pelo próprio script (seção
+16.4), e por isso é refeita em lugar de pulada.
+
+O que a retomada **não** refaz: uma célula com JSON íntegro mas registrada em
+`invalidas.csv`. Essa decisão é do protocolo e não do script — ver 18.4.
+
+### 18.4 Acompanhar o `invalidas.csv`
+
+Toda execução com erro ou com iterações descartadas entra em `results/campaign/invalidas.csv`,
+e o protocolo manda investigar cada uma e repeti-la se a causa for do ambiente. O script não
+descarta nem repete nada sozinho.
+
+```bash
+cat results/campaign/invalidas.csv
+```
+
+O arquivo nasce com apenas o cabeçalho `execucao,taxa_erro,iteracoes_descartadas`. Qualquer
+linha além dele pede investigação. Os rótulos de falha de ambiente —
+`banco_indisponivel`, `banco_nao_reiniciou`, `banco_caiu_durante`, `falha_de_prontidao` e
+`sem_resultado` — são gravados na coluna `taxa_erro`, que o cabeçalho sugere numérica; é a
+convenção do script, e quem ler o arquivo com programa precisa saber (16.4).
+
+Para repetir uma célula depois de investigar, apague o JSON dela e rode o mesmo comando:
+
+```bash
+rm results/campaign/<framework>/<framework>_<taxa>rps_rep<NN>.json
+```
+
+### 18.5 Conferir ao final que são 150 células
+
+```bash
+ls results/campaign/*/*_*rps_rep*.json | wc -l      # deve dar 150
+python scripts/analyze-experiment.py results/campaign
+```
+
+A contagem de 150 é a conferência mais simples, e a que pega o caso em que uma célula ficou
+para trás sem ninguém notar. O `analyze-experiment.py` destaca as execuções com erro ou
+descarte sob o título de execuções a investigar antes de usar, e reporta, por framework e
+nível, o coeficiente de variação entre as 10 repetições e a meia-largura do intervalo de
+confiança de 95% — que são [CV] e [H] da seção 14.9, resultado a reportar e não lacuna a
+preencher.
+
+Esperado por framework: 30 JSONs, 10 em cada um dos três níveis. Por nível: 50 JSONs.
