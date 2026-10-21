@@ -1,0 +1,378 @@
+{
+  "runId": 1,
+  "segment": 1,
+  "baseUrl": "http://nestjs:8080",
+  "rateTarget": 162,
+  "duration": "600s",
+  "preAllocatedVUs": 200,
+  "maxVUs": 200,
+  "vusMaxUsed": 200,
+  "iterations": 97201,
+  "droppedIterations": 0,
+  "requests": 97201,
+  "achievedRps": 162.00166666666667,
+  "errorRate": 0,
+  "bucketSeconds": 10,
+  "series": [
+    {
+      "fromSeconds": 0,
+      "latencyAvgMs": 3.890158335802474,
+      "latencyP95Ms": 7.777573349999997,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 10,
+      "latencyAvgMs": 3.2821246530864157,
+      "latencyP95Ms": 6.094424299999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 20,
+      "latencyAvgMs": 3.2195586465144928,
+      "latencyP95Ms": 5.933922,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 30,
+      "latencyAvgMs": 3.171658906172839,
+      "latencyP95Ms": 5.91353185,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 40,
+      "latencyAvgMs": 3.1634884216049444,
+      "latencyP95Ms": 5.8095246,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 50,
+      "latencyAvgMs": 3.081932582098763,
+      "latencyP95Ms": 5.48351615,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 60,
+      "latencyAvgMs": 3.329863969135798,
+      "latencyP95Ms": 5.93580165,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 70,
+      "latencyAvgMs": 3.537166145679011,
+      "latencyP95Ms": 6.5729257,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 80,
+      "latencyAvgMs": 3.3250829623689078,
+      "latencyP95Ms": 6.117417,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 90,
+      "latencyAvgMs": 3.4600713518518518,
+      "latencyP95Ms": 5.84400475,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 100,
+      "latencyAvgMs": 3.4149337,
+      "latencyP95Ms": 5.83324825,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 110,
+      "latencyAvgMs": 3.4221068018518515,
+      "latencyP95Ms": 5.9815323,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 120,
+      "latencyAvgMs": 3.545417000000004,
+      "latencyP95Ms": 6.29314295,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 130,
+      "latencyAvgMs": 3.626231515432101,
+      "latencyP95Ms": 6.413619299999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 140,
+      "latencyAvgMs": 3.545148441358028,
+      "latencyP95Ms": 6.16108725,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 150,
+      "latencyAvgMs": 3.4294364759259253,
+      "latencyP95Ms": 6.1669315,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 160,
+      "latencyAvgMs": 3.4098688129629586,
+      "latencyP95Ms": 6.2369207,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 170,
+      "latencyAvgMs": 3.423944392350397,
+      "latencyP95Ms": 6.04701,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 180,
+      "latencyAvgMs": 3.469665784567902,
+      "latencyP95Ms": 6.5070211,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 190,
+      "latencyAvgMs": 3.330135313580248,
+      "latencyP95Ms": 6.251260299999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 200,
+      "latencyAvgMs": 3.2240457037037005,
+      "latencyP95Ms": 5.947160599999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 210,
+      "latencyAvgMs": 3.3175823160493874,
+      "latencyP95Ms": 6.192514249999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 220,
+      "latencyAvgMs": 3.760308721604938,
+      "latencyP95Ms": 7.065189949999997,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 230,
+      "latencyAvgMs": 4.187923618136956,
+      "latencyP95Ms": 7.141687,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 240,
+      "latencyAvgMs": 3.3066738506172824,
+      "latencyP95Ms": 6.1457869999999994,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 250,
+      "latencyAvgMs": 3.2508587395061754,
+      "latencyP95Ms": 6.209799599999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 260,
+      "latencyAvgMs": 3.134835614197533,
+      "latencyP95Ms": 5.888363499999998,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 270,
+      "latencyAvgMs": 3.3877937500000024,
+      "latencyP95Ms": 6.10977045,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 280,
+      "latencyAvgMs": 4.095963609259258,
+      "latencyP95Ms": 6.55953175,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 290,
+      "latencyAvgMs": 3.415276256172846,
+      "latencyP95Ms": 6.105134799999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 300,
+      "latencyAvgMs": 3.6501387432098804,
+      "latencyP95Ms": 6.574225749999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 310,
+      "latencyAvgMs": 3.429203264197536,
+      "latencyP95Ms": 6.21737515,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 320,
+      "latencyAvgMs": 3.2883045077112882,
+      "latencyP95Ms": 6.128687,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 330,
+      "latencyAvgMs": 3.364965575925929,
+      "latencyP95Ms": 5.831342350000001,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 340,
+      "latencyAvgMs": 3.3995779382716025,
+      "latencyP95Ms": 5.995278549999997,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 350,
+      "latencyAvgMs": 3.2314357851851834,
+      "latencyP95Ms": 6.061974299999998,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 360,
+      "latencyAvgMs": 3.0786502907407427,
+      "latencyP95Ms": 5.5335676,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 370,
+      "latencyAvgMs": 3.61068556728395,
+      "latencyP95Ms": 6.007821399999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 380,
+      "latencyAvgMs": 3.320057149290556,
+      "latencyP95Ms": 5.77293,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 390,
+      "latencyAvgMs": 3.7187881388888884,
+      "latencyP95Ms": 5.80624225,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 400,
+      "latencyAvgMs": 3.194445532098766,
+      "latencyP95Ms": 5.6965889999999995,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 410,
+      "latencyAvgMs": 3.1010115679012387,
+      "latencyP95Ms": 5.403512,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 420,
+      "latencyAvgMs": 3.541803311728397,
+      "latencyP95Ms": 5.716270049999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 430,
+      "latencyAvgMs": 4.3121916438271555,
+      "latencyP95Ms": 6.34679695,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 440,
+      "latencyAvgMs": 4.317956875308636,
+      "latencyP95Ms": 6.751642499999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 450,
+      "latencyAvgMs": 4.054320848765427,
+      "latencyP95Ms": 6.7337438,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 460,
+      "latencyAvgMs": 3.2352929697530826,
+      "latencyP95Ms": 5.83354095,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 470,
+      "latencyAvgMs": 3.50941127082048,
+      "latencyP95Ms": 6.080111,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 480,
+      "latencyAvgMs": 3.641943335185184,
+      "latencyP95Ms": 6.25721055,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 490,
+      "latencyAvgMs": 3.408030760493839,
+      "latencyP95Ms": 6.127591799999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 500,
+      "latencyAvgMs": 3.718454493827162,
+      "latencyP95Ms": 6.0996979499999995,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 510,
+      "latencyAvgMs": 3.624189110493832,
+      "latencyP95Ms": 6.1255333,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 520,
+      "latencyAvgMs": 3.248464647530865,
+      "latencyP95Ms": 5.817082749999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 530,
+      "latencyAvgMs": 3.579922129629624,
+      "latencyP95Ms": 6.265048149999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 540,
+      "latencyAvgMs": 3.2450412827160546,
+      "latencyP95Ms": 6.050629999999999,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 550,
+      "latencyAvgMs": 3.331001882098764,
+      "latencyP95Ms": 6.0075372,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 560,
+      "latencyAvgMs": 3.535204628624315,
+      "latencyP95Ms": 5.997102,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 570,
+      "latencyAvgMs": 3.5688888827160468,
+      "latencyP95Ms": 6.10916345,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 580,
+      "latencyAvgMs": 3.4320228975308704,
+      "latencyP95Ms": 6.06690435,
+      "errorRate": 0
+    },
+    {
+      "fromSeconds": 590,
+      "latencyAvgMs": 3.4972100415375085,
+      "latencyP95Ms": 6.266196399999998,
+      "errorRate": 0
+    }
+  ]
+}

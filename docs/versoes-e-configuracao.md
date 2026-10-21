@@ -1721,6 +1721,10 @@ entre sessões que medem o mesmo aparato; a terceira fica em 80 e 70 s. Reprodut
 entre sessões é requisito mínimo de um critério, e só a terceira o cumpre — argumento
 independente do que motivou propô-la. Nas duas séries do Django isolado as três concordam:
 50 / 10 / 10 s em `warmup-django-pg-novo` e 60 / 10 / 10 s em `warmup-django-pg-usado`.
+**21/10/2026 — a alegação de reprodutibilidade acima não se sustentou.** A segunda série
+deu 220 s pela terceira definição, contra os 80 e 70 s das duas primeiras. O parágrafo fica
+como registro; o que a segunda série mostrou está em 16.5, e explica também por que nenhuma
+das três definições pode certificar D.3 neste nível de carga.
 
 **Duas ressalvas que limitam o que isto autoriza a dizer.** A terceira definição foi
 proposta DEPOIS de ver os dados de 19/10, e o docstring do script o declara: não é
@@ -1785,3 +1789,81 @@ não é defeito, porque a reexecução o sobrescreve, mas um diretório de campa
 pode conter `.stats.csv` órfãos. E o rótulo `banco_caiu_durante` é gravado na coluna
 `taxa_erro` do `invalidas.csv`, que o cabeçalho sugere numérica — é a convenção já usada
 por todos os modos de falha, e quem ler o arquivo com script precisa saber.
+
+### 16.5 Segunda série de D.3 (21/10/2026): a tolerância é menor que o ruído
+
+Executada com os parâmetros de 16.3, em `results/warmup-d3-serie2/`, na condição mais limpa
+de toda a investigação: daemon do Docker recém-subido, nenhum contêiner de outro projeto,
+PostgreSQL com 2 s de vida, semente íntegra, 0,05% de CPU na linha de base e 0,14% ao final.
+
+| Definição | `warmup-aberto`, 30/09 | `warmup-protocolo-v3`, 19/10 | `warmup-d3-serie2`, 21/10 |
+|---|---:|---:|---:|
+| (1) CV, k=5 | 90 s | 200 s | **550 s** |
+| (2) ±10% da média | 50 s | 130 s | **não entrou** |
+| (3) mediana + persistência | 80 s | 70 s | **220 s** |
+
+**A alegação de 16.3 está refutada.** A terceira definição foi apresentada ali como a única
+reprodutível entre sessões, por dar 80 e 70 s. Na série que não participou de sua
+formulação ela dá 220 s. Registre-se que a alegação foi feita sobre duas séries e caiu na
+terceira — que é o que uma definição posterior aos dados arrisca.
+
+Registre-se também o que a segunda definição fez: no Django, o último intervalo da série
+traz 30,7 ms isolados, o que leva a média da cauda a 5,8 ms, e **nenhum** intervalo cai
+dentro de ±10% dela. Um único intervalo em 60 reprova a série inteira. É o defeito que
+16.3 diagnosticou, agora na sua forma extrema.
+
+#### A causa, e ela é reprodutível
+
+O que não se reproduz é o valor que os critérios devolvem. O que se reproduz é a razão:
+compara-se a meia-largura da banda, 0,10 × regime, com o desvio-padrão do próprio platô —
+do segundo intervalo em diante, descartados os três maiores valores como picos isolados:
+
+| Framework | 30/09 | 19/10 | 21/10 |
+|---|---:|---:|---:|
+| ASP.NET Core | 0,30× | 0,40× | 0,39× |
+| Django | 0,23× | 0,80× | 0,36× |
+| Laravel | 0,17× | 0,45× | 0,72× |
+| NestJS | 0,27× | 0,60× | 0,60× |
+| **Spring Boot** | **0,95×** | **1,14×** | **1,37×** |
+
+Nos quatro primeiros a banda acomoda o ruído com folga. No Spring Boot o ruído do platô
+**iguala ou excede** a banda, nas três séries. Com regime de 2,95 ms, a banda é de ±0,295 ms
+e o platô oscila entre 2,62 e 3,21 ms: a tolerância relativa caiu abaixo da variação
+própria da medição. O efeito é visível no detalhe — na segunda série o intervalo de 210 s
+dá 2,645 ms contra limite inferior de 2,657 ms, e esses 0,012 ms de diferença quebram a
+janela de persistência e empurram a entrada de 180 s para 220 s.
+
+Os 220 s do Spring Boot, portanto, não medem aquecimento. Sua série começa em 310 ms, cai a
+4,1 ms no segundo intervalo e está em 2,93 ms aos 40 s; os valores que atrasam a entrada são
+picos isolados aos 100, 140, 150 e 170 s, mais dois intervalos que passam a 0,5% abaixo do
+limite da banda.
+
+#### O que isto estabelece, e o que não
+
+Estabelece que **nenhuma** das três definições serve como teste de suficiência do
+aquecimento para o Spring Boot neste nível de carga, e por um motivo que não é de
+formulação: tolerância relativa de ±10%, ou CV de 2%, sobre regime de 2,6 a 3,0 ms exige
+precisão que a medição não tem. Trocar a regra de entrada não resolve o que é um problema
+de resolução.
+
+Mantém-se o que as três séries afirmam de modo consistente: **taxa de erro nula nos cinco
+frameworks, nas três execuções**, que é a metade de D.3 que não depende de critério de
+estabilização. E a leitura direta das séries continua compatível com os 150 s: os cinco
+tratamentos estão a menos de 1,5× do regime a partir do segundo intervalo, e o único
+transiente de ordem de grandeza — o primeiro intervalo do Spring Boot e do ASP.NET Core —
+se extingue em 10 s.
+
+Não estabelece que D.3 está satisfeito, e **a tag `protocolo-v3` segue não emitida**.
+
+Fica também registrado, sem explicação, que o regime do Laravel subiu entre as sessões —
+5,86, 6,04 e 6,95 ms —, um aumento de 19% da primeira à terceira. Se o regime de um
+tratamento varia entre sessões, a comparação de tempos de entrada entre sessões fica
+confundida, e essa é mais uma razão para não decidir o aquecimento por um único número.
+
+#### Uma saída possível, não adotada
+
+Um piso absoluto na tolerância — ±10% **ou** ±0,5 ms, o que for maior — devolveria sentido
+ao critério quando o regime se aproxima da resolução da medição. Seria, no entanto, a
+segunda definição proposta depois de ver os dados, e a primeira já caiu na série seguinte.
+Se for adotada, deve ser em texto, declarada como tal, e verificada em série nova — não
+nestas três.
