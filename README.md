@@ -51,10 +51,17 @@ análise:
 python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
 ```
 
-O aparato de coleta está congelado na tag `protocolo-v2`, no commit `b5499ea`: `scripts/`,
-`k6/` e `infra/` não mudam sem nova tag. `README.md`, `docs/` e `results/` ficam fora dela.
-A seção 15 de `docs/versoes-e-configuracao.md` registra o que foi verificado antes do
-congelamento, e a ressalva que permanece.
+O aparato de coleta está congelado na tag `protocolo-v3`, no commit `cfc67a8`: `scripts/`,
+`k6/` e `infra/` não mudam sem nova tag. `README.md`, `docs/` e `results/` ficam **fora**
+dela, e seguem sendo escritos sem mover o protocolo.
+
+O que mudou desde a `protocolo-v2` (`b5499ea`): o `common.sh` ganhou o `restart_postgres`; o
+`run-experiment.sh` passou a reiniciar o banco por célula e teve corrigido o aninhamento que
+mantinha inerte a detecção de queda do banco; o `verify-warmup.sh` reinicia o banco por
+tratamento; e o `analyze-warmup.py` ganhou a terceira definição de entrada em regime e o piso
+de tolerância. Entraram também o `analyze-d3.py` e o `analyze-capacity-deriva.py`. O motivo
+está na seção 15.3.6 de `docs/versoes-e-configuracao.md`, e a conclusão do critério de aceite
+D.3 na seção 17 — que não se apoia em critério de banda, pelas razões ali registradas.
 
 ## Sequência de uso
 
