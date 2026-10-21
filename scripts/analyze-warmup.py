@@ -38,6 +38,28 @@ exige que a entrada PERSISTA por K_PERSISTENCIA intervalos consecutivos, o que i
 único intervalo na banda, por acidente, conte como entrada. O ruído posterior não é
 descartado: é reportado à parte, em contagem e instantes, para que se possa julgar se a
 entrada foi real e quanto ruído de fundo a série tem.
+
+PISO ABSOLUTO NA TOLERÂNCIA — acrescentado à terceira definição em 21/10/2026, também DEPOIS
+de ver os dados, e também não pré-registrado. É a SEGUNDA correção post hoc do critério, e a
+primeira caiu na série seguinte à que a motivou: a terceira definição sem piso deu 80 s em
+30/09, 70 s em 19/10 e 220 s em 21/10. Quem ler isto deve descontar o crédito que daria a um
+critério fixado antes dos dados.
+
+O motivo: tolerância puramente relativa perde sentido quando o regime se aproxima da
+resolução da medição. Nas três séries, a razão entre o desvio-padrão do platô e a
+meia-largura da banda fica entre 0,17 e 0,80 em quatro dos frameworks, mas dá 0,95, 1,14 e
+1,37 no Spring Boot: o ruído próprio da medição iguala ou excede a tolerância. Com regime de
+2,95 ms a banda relativa é de ±0,295 ms e o platô oscila entre 2,62 e 3,21 ms; na série de
+21/10 um intervalo 0,012 ms abaixo do limite empurrou a entrada de 180 s para 220 s.
+
+A banda passa a ser max(TOL × regime, TOL_ABS). TOL_ABS vale 0,5 ms por ser a ordem de
+grandeza do ruído observado nessas séries — desvio-padrão de platô de até 0,50 ms —, e não
+por derivação independente. O piso só atua quando o regime fica abaixo de 5 ms, isto é, onde
+a tolerância relativa desce abaixo do ruído; acima disso a banda segue sendo a de ±10%.
+
+As definições (1) e (2) NÃO recebem o piso, de propósito: os valores delas já registrados nas
+seções 16.1, 16.3 e 16.5 de docs/versoes-e-configuracao.md seguem reproduzíveis por este
+script.
 """
 import sys
 
@@ -72,6 +94,10 @@ JANELAS = (3, 5, 6, 10)
 # não por calibração independente — o que torna os dois números comparáveis entre si.
 K_PERSISTENCIA = 5
 
+# Piso absoluto da tolerância da terceira definição, em ms. Ver o docstring: acrescentado em
+# 21/10/2026, depois dos dados, e atuante apenas quando o regime fica abaixo de 5 ms.
+TOL_ABS = 0.5
+
 
 def coef_var(valores):
     n = len(valores)
@@ -95,21 +121,26 @@ def mediana(valores):
 
 def entrada_persistente(lat, regime, passo, k=K_PERSISTENCIA):
     """Terceira definição: primeiro intervalo a partir do qual k intervalos consecutivos
-    ficam dentro de ±TOL do regime, com o regime tomado pela MEDIANA da cauda.
+    ficam dentro da banda do regime, com o regime tomado pela MEDIANA da cauda e a banda
+    igual a max(TOL × regime, TOL_ABS).
 
     Devolve também as excursões POSTERIORES à entrada — instante e valor de cada intervalo
     que sai da banda depois dela. São ruído de fundo, e não aquecimento: é a distinção que
     as duas definições anteriores não fazem.
     """
     if regime <= 0 or len(lat) < k:
-        return {'inicio': None, 'excursoes': []}
-    dentro = [abs(v - regime) <= TOL * regime for v in lat]
+        return {'inicio': None, 'excursoes': [], 'banda': 0.0, 'pisoAtuou': False}
+    banda = max(TOL * regime, TOL_ABS)
+    dentro = [abs(v - regime) <= banda for v in lat]
     inicio = next((i for i in range(len(lat) - k + 1) if all(dentro[i:i + k])), None)
     if inicio is None:
-        return {'inicio': None, 'excursoes': []}
+        return {'inicio': None, 'excursoes': [], 'banda': banda,
+                'pisoAtuou': banda > TOL * regime}
     return {
         'inicio': inicio * passo,
         'excursoes': [(i * passo, lat[i]) for i in range(inicio, len(lat)) if not dentro[i]],
+        'banda': banda,
+        'pisoAtuou': banda > TOL * regime,
     }
 
 
@@ -256,8 +287,8 @@ def main(padroes):
     print('Entrada em regime pelas TRÊS definições (sem substituir nenhuma):')
     print('  (1) CV < %.0f%% em k=%d intervalos      (2) 1º intervalo a ±%.0f%% da MÉDIA da cauda'
           % (CV_MAX * 100, K_ADOTADO, TOL * 100))
-    print('  (3) %d intervalos consecutivos a ±%.0f%% da MEDIANA da cauda'
-          % (K_PERSISTENCIA, TOL * 100))
+    print('  (3) %d intervalos consecutivos dentro de max(±%.0f%%, ±%.1f ms) da MEDIANA da cauda'
+          % (K_PERSISTENCIA, TOL * 100, TOL_ABS))
     print()
     print('%-12s %9s %9s %9s %9s %s'
           % ('framework', '(1) CV', '(2) média', '(3) mediana', 'regime(3)', 'excursões após a entrada (3)'))
@@ -276,7 +307,8 @@ def main(padroes):
               % (a['framework'],
                  'n/a' if j is None else '%d s' % j,
                  'n/a' if a['entradaSegundos'] is None else '%d s' % a['entradaSegundos'],
-                 'n/a' if pe['inicio'] is None else '%d s' % pe['inicio'],
+                 ('n/a' if pe['inicio'] is None else '%d s' % pe['inicio'])
+                 + ('*' if pe.get('pisoAtuou') else ''),
                  a['regimeMediana'], txt))
 
     def pior_de(valores):
@@ -288,6 +320,9 @@ def main(padroes):
              pior_de([a['cvJanela'][K_ADOTADO]['inicio'] for a in linhas]),
              pior_de([a['entradaSegundos'] for a in linhas]),
              pior_de([a['persistente']['inicio'] for a in linhas])))
+    if any(a['persistente'].get('pisoAtuou') for a in linhas):
+        print('  * piso de ±%.1f ms atuou (regime abaixo de %.1f ms); ver o docstring.'
+              % (TOL_ABS, TOL_ABS / TOL))
 
     print()
     for a in linhas:
