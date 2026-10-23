@@ -2087,6 +2087,75 @@ deriva chegou a ser escrita.
 
 Escrito em 21/10/2026, com o aparato congelado em `protocolo-v3`. Nada aqui foi executado.
 
+**23/10/2026.** O congelamento passou a `protocolo-v4` (`2b1a729`), que só acrescenta a
+interrupção limpa da seção 20; o comando, a duração e a conferência abaixo não mudam. A 18.0
+foi acrescentada nesta data, com os pré-requisitos de ambiente que a tentativa de começar a
+campanha revelou.
+
+### 18.0 Pré-requisitos de ambiente
+
+A campanha é uma execução de cerca de 19 h numa máquina de uso pessoal. O aparato não
+controla o ambiente em que roda, e três condições dele, medidas em 22 e 23/10/2026, a
+interromperiam ou a contaminariam. Nenhuma é opcional.
+
+**1. O Docker Desktop de pé, e estável.** Ele caiu duas vezes durante a preparação: uma
+deixou o `tcc-postgres` em `Exited (255)` dez horas antes de ser notado, e a outra deixou o
+daemon fora do ar em 23/10. Sem o daemon o script morre; a retomada por célula refaz só a
+célula em curso, mas a campanha para até alguém religá-la.
+
+**2. A máquina sem outra carga.** Em 22/10, com o aparato pronto, uma suíte de testes de
+outro projeto rodava com Testcontainers — `quay.io/keycloak/keycloak:26.0`,
+`postgres:16-alpine` e o coletor `testcontainers/ryuk` —, e o PostgreSQL dela marcou **88%
+de CPU** numa amostra. Já se mediu o que carga ambiente faz aqui: na reexecução de
+aquecimento de 19/10 a latência de regime do Spring Boot subiu 62% (seção 15.3.2). Durante as
+19 h, nada além do aparato deve usar o Docker nem disputar CPU.
+
+**3. A máquina sem suspender.** Pelas configurações de energia lidas em 23/10/2026, ela
+suspende após **4 h** ociosa na tomada (`0x3840` = 14.400 s) e hiberna após 4 h na tomada ou
+**3 h** na bateria (`0x2a30` = 10.800 s). Na suspensão, a máquina virtual do WSL2 cai e leva o
+Docker Desktop junto — a causa provável das duas quedas do item 1. Sem providência, **a
+campanha morreria por volta da quarta hora**. É preciso o notebook na tomada e a suspensão
+desligada durante a execução: ajustando "suspender" para "nunca" na tomada, ou mantendo a
+máquina acordada por recurso do próprio ambiente que dispara a campanha. As configurações de
+energia são do usuário da máquina e não foram alteradas por ninguém neste trabalho.
+
+#### Conferência imediatamente antes da primeira célula
+
+```bash
+docker version --format '{{.Server.Version}}'                  # o daemon responde
+docker ps --format '{{.Names}}\t{{.Image}}'                     # apenas tcc-postgres
+docker stats --no-stream --format '{{.Name}} {{.CPUPerc}}'     # CPU perto de zero
+df -h .                                                        # espaço livre
+```
+
+```powershell
+powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE   # índice de CA: 0x00000000 = nunca
+```
+
+E as imagens devem ser as identificadas em `results/versions/imagens.txt` (seção 19):
+
+```bash
+for i in springboot django nestjs laravel aspnet; do
+  printf '%-12s ' "$i"; docker image inspect "tcc-bench-$i" --format '{{.Id}}'
+done
+```
+
+Um digest diferente do registrado significa que alguém reconstruiu a imagem desde 22/10, e
+pede o mesmo tratamento da seção 19 — registrar a versão e reverificar D.1 e D.2 — antes
+de medir.
+
+Sobre o disco: em 22/10 havia 28 GB livres, com 95% do volume ocupado. A saída da campanha é
+pequena, da ordem de megabytes, mas convém não começar com menos que isso.
+
+#### Se uma condição falhar no meio
+
+A retomada por célula (18.3) e o `limpar()` (seção 20) limitam o prejuízo à célula em curso.
+Religa-se o que caiu, repete-se a conferência acima, e roda-se o mesmo comando de 18.1. Uma
+célula medida sob carga ambiente, porém, **não** é refeita sozinha: ela grava JSON íntegro e
+a retomada a considera concluída. Se a carga for notada depois, a célula precisa ser apagada
+à mão, como em 18.4, e isso só é possível se alguém souber em que intervalo a carga ocorreu.
+É mais um motivo para o item 2 ser cumprido do começo ao fim, e não remediado.
+
 ### 18.1 O comando
 
 Depois dos passos 1 a 4 da sequência do README — banco de pé, framework no ar, critérios de
