@@ -1,0 +1,47 @@
+=== identificação das imagens medidas ===
+Reconstruídas em 22/10/2026, com o aparato congelado em protocolo-v3 (cfc67a8).
+A tag congela scripts/, k6/ e infra/; NÃO congela as imagens, e por isso elas
+são identificadas aqui por digest.
+
+Regenerar:
+  for i in springboot django nestjs laravel aspnet; do
+    printf '%-12s ' "$i"; docker image inspect "tcc-bench-$i" --format '{{.Id}}'
+  done
+
+springboot   sha256:e808165e8ddc640ce8449a1817619efc11308edaef2a12ed3ec6087e70a32f7f
+django       sha256:21a62c5cc1a9c63be64b005a3ea8a774c545dd3a95b9cec154b5f1710f355271
+nestjs       sha256:0caf02f66d3d68d14c947bf919f7f2be8e04b2e41c368003c3dba6499da6876c
+laravel      sha256:101e5d6de8ae7273e4712f4707766f436c339f97f9ed65228c9299066c12ef9e
+aspnet       sha256:6ef56320c721f771cbced761471526f36c064b8d05238f1182db1fa9e4059310
+
+=== imagens-base declaradas nos Dockerfiles ===
+Todas as cinco usam tag MÓVEL, o que significa que uma reconstrução futura pode
+resolver para outro patch. Foi o que ocorreu em 22/10/2026 com o ASP.NET Core.
+
+springboot   maven:3.9-eclipse-temurin-25 (build) + eclipse-temurin:25-jre
+django       python:3.13-slim
+nestjs       node:24-alpine (build e runtime)
+laravel      php:8.5-fpm
+aspnet       mcr.microsoft.com/dotnet/sdk:10.0 (build) + dotnet/aspnet:10.0
+
+=== o que a reconstrução de 22/10/2026 mudou ===
+aspnet       runtime 10.0.12 -> 10.0.13; commit 95017c711e -> 4099f83977.
+             Nenhum pacote NuGet mudou: os "Resolved" de dotnet list package
+             são idênticos.
+springboot   imagem de 596 MB para 575 MB SEM mudança de versão: openjdk
+             25.0.4 e Maven 3.9.16 idênticos. A diferença é de empacotamento
+             de camadas, e não de conteúdo versionado.
+laravel      reconstruída, sem mudança de versão.
+django       build integralmente cacheado; imagem intacta.
+nestjs       build integralmente cacheado; imagem intacta.
+
+=== reverificação de D.1 e D.2 após a mudança, em 22/10/2026 ===
+D.1  contrato aspnet: 76 ok, 0 falhas.
+     compare-fingerprints.sh: os cinco fingerprints idênticos, 319 bytes cada,
+     e byte a byte iguais aos results/fingerprint-*.json de 10/09/2026 — o
+     patch não alterou nenhum registro devolvido, nem quantidade, nem
+     identificador, nem ordem.
+D.2  list 1, byId 1, search 1, create 2, update 2 — o contrato do Quadro C4.
+     Plano da busca por prefixo: Index Scan using idx_books_title, Index Cond
+     de limites ('Alfa' <= title < 'Alfb'), SEM nó Sort.
+     log_statement restaurado a 'none' ao final, pelo próprio script.

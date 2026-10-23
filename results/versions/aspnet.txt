@@ -1,19 +1,19 @@
 === runtime ===
 
 Host:
-  Version:      10.0.12
+  Version:      10.0.13
   Architecture: x64
-  Commit:       95017c711e
+  Commit:       4099f83977
   RID:          linux-x64
 
 .NET SDKs installed:
   No SDKs were found.
 
 .NET runtimes installed:
-  Microsoft.AspNetCore.App 10.0.12 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]
+  Microsoft.AspNetCore.App 10.0.13 [/usr/share/dotnet/shared/Microsoft.AspNetCore.App]
 === pacotes (dotnet list package --include-transitive) ===
   Determining projects to restore...
-  Restored /p/BookApi.csproj (in 4.25 sec).
+  Restored /p/BookApi.csproj (in 8.58 sec).
 Project 'BookApi' has the following package references
    [net10.0]: 
    Top-level Package                            Requested   Resolved

@@ -69,7 +69,7 @@ D.3 na seção 17 — que não se apoia em critério de banda, pelas razões ali
 # 1. banco de dados (permanece ativo durante toda a campanha)
 docker compose -f infra/docker-compose.yml up -d postgres
 
-# 2. subir um framework
+# 2. subir um framework (--build pertence À MONTAGEM: ver a nota logo abaixo)
 docker compose -f infra/docker-compose.yml --profile springboot up -d --build
 # ao trocar de framework, remova apenas o serviço da aplicação — `down` derrubaria
 # também o PostgreSQL e destruiria a base:
@@ -92,6 +92,14 @@ RATES="81 162 243" DURATION=300s ./scripts/run-experiment.sh
 O passo 3 é o que sustenta, perante a banca, a afirmação de que a especificação funcional
 da API foi mantida constante entre os tratamentos. Nenhum dado coletado antes de os cinco
 `fingerprint-*.json` serem idênticos entre si tem validade comparativa.
+
+O `--build` do passo 2 pertence à fase de montagem. Depois que as imagens passam a ser o
+artefato medido, sobe-se **sem** ele — `up -d --force-recreate --no-deps <framework>` —, que é
+o que o laço da campanha faz por conta própria. O motivo: os cinco Dockerfiles usam tag móvel
+de imagem-base, de modo que uma reconstrução pode trazer outro patch de runtime. Ocorreu em
+22/10/2026, com o ASP.NET Core indo de 10.0.12 a 10.0.13. Os digests das imagens medidas estão
+em `results/versions/imagens.txt`, e a seção 19 de `docs/versoes-e-configuracao.md` registra a
+limitação.
 
 ## Ordem de implementação sugerida
 

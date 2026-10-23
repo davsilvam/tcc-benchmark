@@ -2182,3 +2182,86 @@ confiança de 95% — que são [CV] e [H] da seção 14.9, resultado a reportar 
 preencher.
 
 Esperado por framework: 30 JSONs, 10 em cada um dos três níveis. Por nível: 50 JSONs.
+
+---
+
+## 19. As imagens não estão congeladas (22/10/2026)
+
+As cinco imagens foram reconstruídas em 22/10/2026, antes da campanha e com zero células
+medidas. A reconstrução expôs uma lacuna do congelamento que convém registrar antes de o
+texto afirmar reprodutibilidade.
+
+### 19.1 A lacuna
+
+A tag `protocolo-v3` congela `scripts/`, `k6/` e `infra/`. **Não congela as imagens**, e os
+cinco Dockerfiles usam tag móvel de imagem-base:
+
+| Framework | Imagem-base |
+|---|---|
+| Spring Boot | `maven:3.9-eclipse-temurin-25` (build) + `eclipse-temurin:25-jre` |
+| Django | `python:3.13-slim` |
+| NestJS | `node:24-alpine` (build e runtime) |
+| Laravel | `php:8.5-fpm` |
+| ASP.NET Core | `mcr.microsoft.com/dotnet/sdk:10.0` (build) + `dotnet/aspnet:10.0` |
+
+Os arquivos de bloqueio — `package-lock.json`, `composer.lock`, o `pom.xml` com versões
+fixas — são versionados e fixam as dependências da aplicação. O runtime e os pacotes de
+sistema, não. Em consequência, **um clone construído em outra data recebe outros patches de
+runtime**, e a afirmação de que o aparato é reproduzível a partir de qualquer clone, que o
+comentário do `.gitattributes` toma como objetivo, vale para os scripts e não vale para o que
+eles medem.
+
+### 19.2 O que a reconstrução mudou
+
+| Framework | Mudança |
+|---|---|
+| **ASP.NET Core** | runtime **10.0.12 → 10.0.13**, commit `95017c711e` → `4099f83977`. Nenhum pacote NuGet mudou. |
+| Spring Boot | imagem de 596 para 575 MB **sem** mudança de versão: `openjdk 25.0.4` e `Maven 3.9.16` idênticos. |
+| Laravel | reconstruída, sem mudança de versão. |
+| Django | build integralmente cacheado; imagem intacta. |
+| NestJS | build integralmente cacheado; imagem intacta. |
+
+O caso do Spring Boot merece nota porque a diferença de 21 MB chegou a ser lida, aqui, como
+candidata a mudança de versão. Não é: o `results/versions/springboot.txt` não mudou uma linha.
+A diferença é de empacotamento de camadas. **Tamanho de imagem não é indicador de drift**, e
+foi por falta de um identificador melhor que se recorreu a ele.
+
+### 19.3 Identificação das imagens, e reverificação
+
+Para que drift futuro seja detectável por comparação em lugar de inferência, os digests das
+imagens medidas passam a ser registrados em `results/versions/imagens.txt`, com o comando que
+os regenera.
+
+A mudança de runtime do ASP.NET Core invalidou, para aquele tratamento, o argumento da seção
+15.1 — de que D.1 e D.2 não precisavam ser reexecutados porque nada que eles verificam havia
+mudado. Os dois foram então reverificados em 22/10/2026:
+
+| Critério | Resultado |
+|---|---|
+| D.1, contrato | `contrato aspnet: 76 ok, 0 falhas` |
+| D.1, registros idênticos | os cinco fingerprints idênticos, 319 bytes cada |
+| D.2, consultas por requisição | 1 / 1 / 1 / 2 / 2, o contrato do Quadro C4 |
+| D.2, plano da busca | `Index Scan using idx_books_title`, `Index Cond` de limites de prefixo, **sem** nó `Sort` |
+
+O resultado mais forte não é o 76/76: é que os cinco `results/fingerprint-*.json`, reescritos
+pelo `compare-fingerprints.sh`, saíram **byte a byte iguais** aos commitados em 10/09/2026. O
+patch não alterou nenhum registro devolvido — nem quantidade, nem identificador, nem ordem,
+inclusive no `searchAlfa`, cuja ordenação por `title` é o que evidencia tradução equivalente
+do filtro de prefixo pelos cinco ORMs. Como o script roda os cinco, os outros quatro ficaram
+revalidados de passagem.
+
+O `log_statement` foi restaurado a `none` ao final, pelo próprio `verify-queries.sh`.
+
+### 19.4 O que se faz, e o que fica declarado
+
+Feito: o registro de versões passa a descrever o 10.0.13, que é o que a campanha vai medir;
+os digests ficam gravados; e o README registra que o `--build` do passo 2 pertence à fase de
+montagem, porque o laço da campanha sobe os contêineres **sem** reconstruir — o `app_up` usa
+`up -d --force-recreate --no-deps`. Durante a campanha, portanto, as imagens não mudam.
+
+Não feito, e declarado como limitação: as imagens-base **não** foram fixadas por digest. Fixá-las
+exigiria alterar os Dockerfiles, em `apps/`, e nova tag. Com os digests registrados e o
+`--build` fora do caminho da campanha, o risco deixa de ser drift silencioso e passa a ser
+drift detectável, o que basta para medir: as 150 células usarão todas o mesmo artefato, e isso
+é verificável. O que não se obtém é reprodutibilidade da construção a partir de um clone em
+outra data, e essa é a limitação a declarar no texto, ao lado das demais da seção 3.6.
