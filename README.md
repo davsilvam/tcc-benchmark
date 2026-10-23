@@ -51,7 +51,7 @@ análise:
 python scripts/analyze-capacity.py --dir results/capacity --p95-max 100
 ```
 
-O aparato de coleta está congelado na tag `protocolo-v3`, no commit `cfc67a8`: `scripts/`,
+O aparato de coleta está congelado na tag `protocolo-v4`, no commit `2b1a729`: `scripts/`,
 `k6/` e `infra/` não mudam sem nova tag. `README.md`, `docs/` e `results/` ficam **fora**
 dela, e seguem sendo escritos sem mover o protocolo.
 
@@ -62,6 +62,16 @@ tratamento; e o `analyze-warmup.py` ganhou a terceira definição de entrada em 
 de tolerância. Entraram também o `analyze-d3.py` e o `analyze-capacity-deriva.py`. O motivo
 está na seção 15.3.6 de `docs/versoes-e-configuracao.md`, e a conclusão do critério de aceite
 D.3 na seção 17 — que não se apoia em critério de banda, pelas razões ali registradas.
+
+E desde a `protocolo-v3` (`cfc67a8`), em um ponto só: o `run-experiment.sh` ganhou o `limpar()`,
+com `trap` em `EXIT`, `INT` e `TERM`, que derruba o contêiner da aplicação e remove o do k6 ao
+ser interrompido. Sem ele, matar o script deixava a medição rodando — medido, 5,8% de CPU no k6
+cinco segundos depois do sinal. A seção 20 registra o teste e um efeito a conhecer antes de
+interromper: o bash adia o `trap` até o fim do comando em curso, de modo que a célula completa
+antes de a parada ter efeito.
+
+As **imagens** não estão congeladas pela tag. Elas são identificadas por digest em
+`results/versions/imagens.txt`, e a seção 19 registra a limitação.
 
 ## Sequência de uso
 
