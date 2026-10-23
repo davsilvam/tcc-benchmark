@@ -79,7 +79,26 @@ shuffle() {
   python -c "import random,sys; r=random.Random(int(sys.argv[1])); l=sys.argv[2:]; r.shuffle(l); print(' '.join(l))" "$@"
 }
 
-trap 'stats_stop' EXIT
+# Interrupção limpa, pelo mesmo motivo que o run-capacity.sh ganhou a sua em 1540a52, e
+# medido aqui em 22/10/2026: matar o processo do script NÃO mata o que ele deixou rodando.
+# Num teste, 5 s depois de um SIGTERM o contêiner do k6 seguia de pé a 5,8% de CPU e o da
+# aplicação a 7,0% — a medição continuava, porque quem executa o `docker run` do k6 é o
+# daemon e não o cliente. Numa campanha de 19 h isso importa: a retomada por célula convida
+# a rodar em trechos, e a célula seguinte começaria sob a carga da anterior.
+#
+# O stats_stop fica DENTRO desta rotina, e não num trap próprio: dois traps em EXIT não
+# coexistem, o segundo substitui o primeiro, e espelhar o run-capacity.sh sem notar isso
+# trocaria o k6 órfão por um coletor de docker stats órfão.
+limpar() {
+  local st=$?
+  trap - EXIT INT TERM
+  stats_stop
+  [ -n "${fw:-}" ] && app_down "$fw" >/dev/null 2>&1
+  local img="${K6_IMAGE:-grafana/k6:2.2.0}"
+  docker ps -q --filter "ancestor=$img" 2>/dev/null | xargs -r docker rm -f >/dev/null 2>&1
+  exit "$st"
+}
+trap limpar EXIT INT TERM
 
 echo "taxas=${RATE_LIST[*]} req/s  medição=$DURATION  aquecimento=$WARMUP_DURATION  repetições=$REPS"
 

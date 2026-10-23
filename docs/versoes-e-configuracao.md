@@ -2265,3 +2265,68 @@ exigiria alterar os Dockerfiles, em `apps/`, e nova tag. Com os digests registra
 drift detectável, o que basta para medir: as 150 células usarão todas o mesmo artefato, e isso
 é verificável. O que não se obtém é reprodutibilidade da construção a partir de um clone em
 outra data, e essa é a limitação a declarar no texto, ao lado das demais da seção 3.6.
+
+---
+
+## 20. Interromper a campanha (22/10/2026)
+
+Achado ao conferir a prontidão para a campanha, e corrigido antes da primeira célula.
+
+### 20.1 O defeito, medido
+
+O `run-experiment.sh` tinha apenas `trap 'stats_stop' EXIT`. Não derrubava o contêiner da
+aplicação nem o do k6. É o mesmo defeito que `1540a52` corrigiu no `run-capacity.sh`, e que
+ali deixou a máquina com 476% de CPU ocupada depois de o experimento ter sido mandado parar.
+
+Exercitado em 22/10/2026 numa célula de `springboot` a 81 req/s, interrompida 15 s dentro de
+uma medição de 60 s:
+
+| Momento | k6 | aplicação |
+|---|---|---|
+| 15 s dentro da medição | `grafana/k6:2.2.0`, de pé | `tcc-springboot`, de pé |
+| **5 s após o `kill -TERM`** | **de pé, 5,8% de CPU** | **de pé, 7,0% de CPU** |
+
+O PostgreSQL marcava 7 a 8% ao mesmo tempo: a medição seguia inteira depois de o script ter
+morrido. Importa porque a retomada por célula convida a rodar as 19 h em trechos, e a célula
+seguinte começaria sob a carga da anterior.
+
+### 20.2 A correção
+
+Um `limpar()` espelhando o do `run-capacity.sh`, com `trap limpar EXIT INT TERM`. Uma
+diferença que o espelhamento cego estragaria: o `run-experiment.sh` já tinha um trap em
+`EXIT`, e **dois traps no mesmo sinal não coexistem** — o segundo substitui o primeiro. Colar
+o `limpar()` sem notar isso trocaria o k6 órfão por um coletor de `docker stats` órfão. O
+`stats_stop` passa a ser chamado de dentro da rotina.
+
+### 20.3 Um efeito a conhecer antes de interromper
+
+Com trap definido, o bash **adia** a execução dele até o comando em primeiro plano terminar.
+Medido: um `kill -TERM` durante a medição não a interrompe — a célula completa, grava JSON
+íntegro, e só então o `limpar()` roda. Na campanha isso significa até cerca de 460 s entre o
+sinal e a parada efetiva.
+
+É preferível assim: não resta célula meio medida, e a retomada não precisa decidir o que
+fazer com ela. Mas quem interromper precisa saber que a resposta não é imediata.
+
+O Ctrl+C num terminal percorre outro caminho: o sinal vai ao grupo de processos, o cliente
+`docker run` morre de imediato, o contêiner do k6 **sobrevive ao cliente** — porque quem o
+executa é o daemon — e é então que o `limpar()` o remove.
+
+### 20.4 O que se verificou, e o que não
+
+Verificado:
+
+| | |
+|---|---|
+| o defeito existia | medido, com CPU dos dois contêineres após o sinal |
+| a linha de limpeza do k6 funciona | sobe-se um contêiner k6 e a linha exata do `limpar()` o remove |
+| o trap dispara em `INT` e em `TERM` | exercitado nos dois sinais |
+| registrado nos três sinais | `trap limpar EXIT INT TERM`, igual ao `run-capacity.sh` |
+| contêineres caem junto com o script | após o sinal, resta apenas o `tcc-postgres` |
+
+Não verificado: a sequência completa do Ctrl+C **num terminal real**, em que o cliente `docker`
+morre primeiro e o trap remove o contêiner sobrevivente. Três tentativas de simulá-la
+falharam neste ambiente — o Git Bash não tem `setsid`, e a emulação de grupos de processos do
+MSYS não entrega o sinal como um terminal entregaria. A correção foi então verificada por
+decomposição, nas partes acima; a composição delas é o caminho do Ctrl+C, mas isso é
+inferência e não medição.
