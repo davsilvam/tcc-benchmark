@@ -1304,7 +1304,13 @@ independente do k6, com conexões novas, a cascata não atravessa para o patamar
 
 O CV do ASP.NET Core é de 18,7%, o maior dos cinco, com repetições entre 1.500 e 2.325 req/s.
 Não é piora da medição: é a dispersão real de quando ele satura pela primeira vez, que a regra
-da seção 12 escondia ao ignorar saturações. Ele é o framework com mais eventos de saturação
+da seção 12 escondia ao ignorar saturações.
+
+**23/10/2026 — a leitura acima fica enfraquecida.** Remedida a capacidade no modo de energia
+Desempenho Máximo (seção 21), o CV do ASP.NET Core cai para 3,2%, e o de Django e NestJS para
+1,9% e 2,9%. Boa parte da dispersão atribuída aqui ao comportamento do tratamento parece ter
+vindo do gerenciamento de energia do host. Para o ASP.NET Core a atribuição não é limpa: entre
+as duas medições mudou também o runtime, de 10.0.12 para 10.0.13 (seção 19). Ele é o framework com mais eventos de saturação
 esporádica, dez nas cinco execuções, contra cinco do Spring Boot, dois do Laravel, dois do
 NestJS e nenhum do Django.
 
@@ -2167,7 +2173,18 @@ RATES="81 162 243" DURATION=300s REPS=10 OUT=results/campaign ./scripts/run-expe
 
 As taxas saem do teste de capacidade da seção 14 e foram reconferidas em 21/10/2026 com
 `python scripts/analyze-capacity.py --dir results/capacity --p95-max 100`, que devolve
-[C_min] = 325 req/s (Laravel) e os níveis 81, 162 e 243 req/s. `DURATION` e `REPS` são os
+[C_min] = 325 req/s (Laravel) e os níveis 81, 162 e 243 req/s.
+
+**23/10/2026 — as taxas mudaram.** O modo de energia passou a Desempenho Máximo e a
+capacidade foi remedida nele (seção 21): [C_min] = 425 req/s, níveis **106, 212 e 318**. O
+comando da campanha passa a ser
+
+```bash
+RATES="106 212 318" DURATION=300s REPS=10 OUT=results/campaign ./scripts/run-experiment.sh
+```
+
+e os 81, 162 e 243 acima ficam como registro do modo anterior. Duração, retomada e conferência
+não mudam, porque não dependem da taxa. `DURATION` e `REPS` são os
 valores de [D] e de repetições da seção 14.9. O `WARMUP_DURATION` não é passado: fica nos
 150 s que o script traz por padrão.
 
@@ -2399,3 +2416,108 @@ falharam neste ambiente — o Git Bash não tem `setsid`, e a emulação de grup
 MSYS não entrega o sinal como um terminal entregaria. A correção foi então verificada por
 decomposição, nas partes acima; a composição delas é o caminho do Ctrl+C, mas isso é
 inferência e não medição.
+
+---
+
+## 21. Remedição no modo de energia Desempenho Máximo (23/10/2026)
+
+### 21.1 Por que remedir
+
+Ao cumprir os pré-requisitos da seção 18.0, o modo de energia do host foi trocado para
+Desempenho Máximo, junto com a suspensão. O modo controla turbo e limites de potência da CPU
+e, por isso, a latência e a capacidade. Rodar a campanha nele sem remedir deixaria o modelo
+multicritério somar numa nota única a capacidade medida num regime de CPU e a latência e a
+CPU medidas noutro, e faria a frase da seção 3.4.3 — níveis a 25%, 50% e 75% da menor
+capacidade — descrever o que não foi medido. Decidiu-se manter o modo e remedir nele a
+capacidade e D.3.
+
+O estado de energia passou a ser lido do registro do Windows e gravado junto com os dados, em
+`energia.txt` dentro de cada diretório de resultado: plano `Legion Balance Mode`, overlay de
+corrente alternada `ded574b5-45a0-4f42-8737-46345c09c238` (Desempenho Máximo), suspensão e
+hibernação em nunca, máquina na tomada. **O modo vigente nas fases anteriores não foi
+registrado pelo aparato**, e não se sabe qual era.
+
+Os scripts são os de `protocolo-v4`; só os parâmetros de linha de comando mudam.
+
+### 21.2 Capacidade
+
+`results/capacity-desempenho/`, com o comando da seção 14 e o `ORDER_SEED` padrão do
+`run-capacity.sh`, 20260925 — a mesma ordem sorteada de 06/10. As 25 células concluíram.
+
+| Framework | 06/10 | 23/10 | Variação | CV 06/10 | CV 23/10 |
+|---|---:|---:|---:|---:|---:|
+| Laravel | 325 | **425** | +31% | 8,6% | 5,5% |
+| Django | 775 | 950 | +23% | 7,8% | 1,9% |
+| NestJS | 1.525 | 1.700 | +11% | 9,5% | 2,9% |
+| Spring Boot | 1.400 | 1.800 | +29% | 5,4% | 4,5% |
+| ASP.NET Core | 1.700 | 2.600 | +53% | 18,7% | 3,2% |
+
+[C_min] = **425 req/s** (Laravel, moda 3/5). Níveis do teste de carga fixa, arredondados para
+baixo a partir de 106,25, 212,50 e 318,75: **106, 212 e 318 req/s**.
+
+O 425 do Laravel coincide com o maior valor observado dele — 375, 400, 425, 425, 425 —,
+que é a situação estrutural que a seção 12.2 apontou. Agora, porém, com maioria, de modo que a
+regra de resumo se aplica. A folga do nível de 75% até a pior repetição do Laravel é de
+318 → 375, 57 req/s, maior que os 31 req/s que a 12.2 considerou aceitáveis.
+
+Deriva de sessão, pelo `analyze-capacity-deriva.py`: inclinação de **+0,099% por célula**,
+r = **+0,197**. Sem deriva, como em 14.6.1. O `run-capacity.sh` não reinicia o banco por
+célula, e a ausência de deriva nas duas medições é o que sustenta isso.
+
+### 21.3 A ordem de capacidade mudou
+
+| 06/10 | 23/10 |
+|---|---|
+| ASP.NET Core > **NestJS > Spring Boot** > Django > Laravel | ASP.NET Core > **Spring Boot > NestJS** > Django > Laravel |
+
+Spring Boot e NestJS trocam de posição. Como a capacidade é critério do modelo, isto
+estabelece que **a configuração de energia do host altera a ordem dos tratamentos**, e não só
+os valores. É ameaça à validade externa a declarar na seção 3.6.2: o resultado depende de como
+a máquina gerencia a CPU, e não apenas dos frameworks.
+
+### 21.4 A dispersão caiu
+
+Os CVs de Django, NestJS e ASP.NET Core caem para 1,9%, 2,9% e 3,2%. Isso enfraquece a
+leitura da seção 14.6, que tratou os 18,7% do ASP.NET Core como dispersão real do tratamento.
+
+A atribuição tem duas ressalvas. Para o ASP.NET Core, **dois fatores mudaram ao mesmo tempo**:
+o modo de energia e o runtime, de 10.0.12 para 10.0.13 (seção 19), e os +53% e a queda do CV
+dele não podem ser atribuídos a um só. Os outros quatro isolam melhor o fator — as imagens de
+Django e NestJS são byte a byte as de 06/10, e Laravel e Spring Boot têm as mesmas versões —,
+mas mesmo neles a comparação é entre Desempenho Máximo e um modo anterior desconhecido, em
+datas diferentes.
+
+### 21.5 D.3 no modo novo
+
+`results/warmup-desempenho/`, a 212 req/s, 50% do novo [C_min], por 600 s. Evidência direta,
+com as definições do `analyze-d3.py`:
+
+| Framework | Erro | 1º (ms) | 1º / corpo | Acima de 1,5× | 1ª janela / resto |
+|---|---:|---:|---:|---:|---:|
+| ASP.NET Core | 0,0000% | 74,6 | 37,5× | 3 | 0,994 |
+| Django | 0,0000% | 4,9 | 1,6× | 2 | 1,000 |
+| Laravel | 0,0000% | 5,4 | 1,1× | 0 | 0,993 |
+| NestJS | 0,0000% | 3,2 | 1,5× | 0 | 0,994 |
+| Spring Boot | 0,0000% | 112,6 | 61,1× | 4 | 0,998 |
+
+Taxa de erro nula nos cinco; transiente confinado ao primeiro intervalo; e o primeiro minuto
+da janela de medição a menos de 0,7% do resto dela, contra a faixa de 0,937 a 1,120 das quatro
+sessões do modo anterior. O transiente de partida do Spring Boot encolheu de 310–854 ms para
+112,6 ms.
+
+Os critérios de banda, reportados como manda a seção 17: (1) CV pior caso **100 s**, (2) ±10%
+da média **40 s**, (3) mediana com piso **30 s**. É a primeira série desde 30/09 em que os três
+ficam abaixo dos 150 s. Isso é coerente com a hipótese de que o ruído que os derrubava vinha em
+boa parte do host, mas não muda o estatuto deles: seguem reportados, não usados como teste.
+
+**D.3, no modo novo, é sustentado por** taxa de erro nula e transiente confinado ao primeiro
+intervalo de 10 s, contra os 150 s adotados — o mesmo fundamento da seção 17.3.
+
+**A ressalva de n.** No modo novo há **uma** série por framework. O padrão se repete nas quatro
+sessões do modo anterior, o que sugere que ele é robusto entre sessões, mas aquelas foram
+medidas noutro regime de CPU. Uma segunda série no modo novo tornaria a afirmação independente
+de n = 1, ao custo de cerca de 51 min.
+
+Os números desta seção para D.3 foram calculados com as funções do `analyze-d3.py`, que tem as
+quatro sessões anteriores fixas no código. Para que ele as reproduza diretamente, precisaria
+aceitar diretórios como argumento, o que é mudança em `scripts/`.

@@ -1,0 +1,6 @@
+=== estado de energia do host no inicio desta execucao ===
+registrado_em=2026-10-23T22:02:36.3258044-03:00
+plano_ativo=85d583c5-cf2e-4197-80fd-3789a227a72c  (Legion Balance Mode)
+overlay_ca=ded574b5-45a0-4f42-8737-46345c09c238  (ded574b5-... = desempenho maximo)
+bateria_status=2  (2 = conectado a CA)  carga=97%
+nivel=212 req/s, 50% do C_min de 425 medido em results/capacity-desempenho

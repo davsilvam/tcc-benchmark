@@ -1,0 +1,5 @@
+iniciado_em=2026-10-23T18:06:16-03:00
+start=100 step=100 fine_step=25 step_s=20 max_rate=3000
+p95_max=100 p95_safety=5000 reps=5
+order_seed=20260925
+warmup=150s@100rps frameworks=springboot django nestjs laravel aspnet

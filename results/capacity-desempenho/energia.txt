@@ -1,0 +1,11 @@
+=== estado de energia do host no inicio desta execucao ===
+registrado_em=2026-10-23T18:06:05.6704456-03:00
+plano_ativo=85d583c5-cf2e-4197-80fd-3789a227a72c  (Legion Balance Mode)
+overlay_ca=ded574b5-45a0-4f42-8737-46345c09c238  (ded574b5-45a0-4f42-8737-46345c09c238 = desempenho maximo)
+overlay_cc=00000000-0000-0000-0000-000000000000  (00000000-... = equilibrado)
+suspensao_ca=0x00000000  hibernacao_ca=0x00000000  (0x00000000 = nunca)
+bateria_status=2  (2 = conectado a CA)  carga=97%
+
+O modo de energia passou a desempenho maximo em 23/10/2026, por decisao do usuario,
+e esta execucao remede a capacidade nele. O modo vigente no teste de capacidade de
+06/10 e nas series de D.3 nao foi registrado pelo aparato.
