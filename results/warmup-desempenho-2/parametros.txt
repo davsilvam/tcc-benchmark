@@ -1,0 +1,1 @@
+iniciado_em=2026-10-24T11:34:48-03:00 rate=212 duration=600s bucket_s=10

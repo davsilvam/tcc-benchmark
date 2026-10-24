@@ -2521,3 +2521,50 @@ de n = 1, ao custo de cerca de 51 min.
 Os números desta seção para D.3 foram calculados com as funções do `analyze-d3.py`, que tem as
 quatro sessões anteriores fixas no código. Para que ele as reproduza diretamente, precisaria
 aceitar diretórios como argumento, o que é mudança em `scripts/`.
+
+### 21.6 Segunda série de D.3 no modo novo (24/10/2026)
+
+`results/warmup-desempenho-2/`, mesmas condições, com o estado de energia em `energia.txt`.
+Antes dela a máquina tinha sido suspensa pelo usuário, das 02:24 às 11:30 de 24/10. Na
+retomada, o Docker Desktop reiniciou e derrubou o `tcc-postgres` com código 255. Nada estava
+em execução, e a série só começou depois de o banco ser religado e o ambiente conferido.
+
+| Framework | Erro | 1º (ms) | 1º / corpo | Acima de 1,5× | 1ª janela / resto |
+|---|---:|---:|---:|---:|---:|
+| ASP.NET Core | 0,0000% | 79,9 | 40,4× | 2 | 0,970 |
+| Django | 0,0000% | 25,0 | 8,2× | 0 | 0,993 |
+| Laravel | 0,0000% | 8,2 | 1,6× | 2 | 0,992 |
+| NestJS | 0,0000% | 3,3 | 1,6× | 1 | 0,989 |
+| Spring Boot | 0,0000% | 149,3 | 62,9× | 0 | 0,972 |
+
+Somadas as duas séries do modo novo: **taxa de erro nula nas 10 execuções**; nenhum intervalo
+acima de 1,5× o corpo além de 0 a 4 por execução; e o primeiro minuto da medição entre
+**0,970 e 1,000** do resto dela. A ressalva de n = 1 da seção 21.5 deixa de valer.
+
+**Uma qualificação sobre o Spring Boot.** Na série 2 o transiente dele não fica só no
+primeiro intervalo. Depois dos 62,9× iniciais vem uma cauda que cai de 1,30× aos 10 s para
+1,03× aos 50 s, e um pico de até 1,19× entre 90 e 110 s. Aos 150 s, início da medição, ele
+está em 0,92×. Nada disso passa de 1,5×, de modo que os critérios da evidência direta se
+mantêm, e tudo cai dentro dos 150 s de aquecimento. Mas a formulação da seção 17.3 — de que
+os 150 s são "quinze vezes a duração do único transiente observado" — depende do limiar: vale
+para o transiente de ordem de grandeza, que dura um intervalo; com uma leitura mais estrita,
+que conte como aquecimento qualquer coisa acima de 1,1×, o Spring Boot fica elevado até cerca
+de 110 s nesta série, e a folga cai para uns 40 s. Os 150 s seguem bastando; a margem é que é
+menor do que "quinze vezes".
+
+Os critérios de banda, reportados, nas duas séries do modo novo:
+
+| Definição | Série 1 | Série 2 |
+|---|---:|---:|
+| (1) CV < 2% em k = 5 | 100 s | **460 s** |
+| (2) ±10% da média | 40 s | 60 s |
+| (3) mediana + piso | 30 s | 40 s |
+
+O critério do coeficiente de variação volta a variar entre sessões, de 100 para 460 s, também
+no modo novo. A conclusão da seção 17.2 — de que nenhum critério de banda relativa se mostrou
+estável entre sessões — se confirma no novo regime.
+
+**D.3, no modo novo, é sustentado por** taxa de erro nula nas 10 execuções e por um aquecimento
+que termina dentro dos 150 s em todas elas: o transiente de ordem de grandeza dura um
+intervalo, e o resíduo abaixo de 1,5× que o Spring Boot mostra na série 2 se extingue até os
+120 s.
