@@ -1,0 +1,7 @@
+iniciado_em=2026-10-24T14:51:47-03:00
+rates=106 212 318
+duration=300s
+warmup_duration=150s
+reps=10
+order_seed=20260922
+frameworks=springboot django nestjs laravel aspnet

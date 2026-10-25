@@ -2568,3 +2568,81 @@ estável entre sessões — se confirma no novo regime.
 que termina dentro dos 150 s em todas elas: o transiente de ordem de grandeza dura um
 intervalo, e o resíduo abaixo de 1,5× que o Spring Boot mostra na série 2 se extingue até os
 120 s.
+
+---
+
+## 22. A campanha (24 e 25/10/2026)
+
+Executada com `protocolo-v4` (`2b1a729`), no modo de energia Desempenho Máximo, com o comando
+da seção 18.1:
+
+```bash
+RATES="106 212 318" DURATION=300s REPS=10 ORDER_SEED=20260922 OUT=results/campaign ./scripts/run-experiment.sh
+```
+
+A conferência da seção 18.0 foi feita imediatamente antes: daemon respondendo, apenas o
+`tcc-postgres` de pé a 0,00% de CPU, 30 GB livres, os cinco digests iguais aos de
+`results/versions/imagens.txt`, e o estado de energia gravado em `results/campaign/energia.txt`.
+
+### 22.1 Execução
+
+| | |
+|---|---|
+| início | 24/10/2026, 14:51:47 |
+| último JSON | 25/10/2026, 10:05:26 |
+| duração | **19 h 13 min**, contra 19 h 10 min estimadas na seção 18.2 |
+| invocações do script | **1** — nenhuma retomada |
+| células | **150 de 150**: 30 por framework, 50 por taxa |
+| `invalidas.csv` | **vazio** — nenhuma execução com erro ou descarte |
+| taxa obtida | 106,00 / 212,00 / 318,00 req/s ± 0,00, em todas as combinações |
+
+Análise, pelo script versionado:
+
+```bash
+python scripts/analyze-experiment.py results/campaign
+```
+
+### 22.2 As condições valeram as 19 h?
+
+**Suspensão: não houve.** O registro do Windows não tem evento de suspensão nem de retomada
+entre 24/10 14:51 e 25/10 10:06, e o estado de energia ao final é o do início: overlay
+Desempenho Máximo, máquina na tomada.
+
+**Carga externa: não verificável diretamente.** A consulta ao `docker events` sobre a janela
+devolveu um único início de contêiner, quando a campanha iniciou centenas: o daemon só retém os
+eventos mais recentes, e a consulta não cobre as 19 h. Não se pode afirmar, por ela, que nada
+de fora rodou.
+
+A evidência indireta é a consistência entre repetições. Carga externa sobre uma célula a
+deslocaria e inflaria o CV do tratamento dela. O CV entre as 10 repetições fica entre **0,5%
+e 2,2%** no p95 e na latência média, em todas as 15 combinações de framework e taxa, e a
+meia-largura relativa projetada do intervalo de confiança de 95% do p95 não passa de 1,5%.
+Nenhuma combinação mostra a assinatura de contaminação.
+
+### 22.3 Observações a considerar na leitura dos resultados
+
+Registram-se como fatos do aparato, e não como conclusão.
+
+**A latência cai com o aumento da carga em quatro dos cinco tratamentos.** O p95 do ASP.NET
+Core vai de 4,80 para 4,06 e 3,83 ms entre 106, 212 e 318 req/s; o do Spring Boot, de 4,18
+para 3,38 e 3,17; o do NestJS, de 4,51 para 3,91 e 3,75; o do Django, de 5,36 para 4,90 e
+4,87. O do Laravel fica estável, em 7,60, 7,49 e 7,64. Teoria de filas preveria o contrário. A
+hipótese mais provável — **não testada** — é o gerenciamento de energia da CPU: com chegadas
+mais espaçadas, os núcleos entram em estados de economia entre requisições e pagam latência de
+retomada; com chegadas mais densas, permanecem ativos. Se for o caso, o nível de 106 req/s
+mede em parte o host, e não só o tratamento — o mesmo tipo de efeito que a seção 21 encontrou
+na capacidade.
+
+**A CPU de pico é estatística frágil.** O CV dela chega a 87,3% no Django a 106 req/s e a 56,0%
+no Spring Boot à mesma taxa, enquanto a CPU média dos mesmos tratamentos tem CV de 2,0% e 3,3%.
+O pico é um máximo, sensível a uma única amostra do `docker stats`; a média é robusta.
+
+**A memória do Laravel varia só na taxa mais baixa**: CV de 14,6% a 106 req/s, contra 1,5% e
+0,7% a 212 e 318. A do Spring Boot varia de 6% a 12% nas três taxas, compatível com a
+coleta de lixo da JVM, cujo instante de execução varia entre repetições.
+
+**O intervalo efetivo de amostragem do `docker stats`** ficou em 2,01 s, de 2,00 a 2,02. É o
+que o comentário do `stats_start` em `common.sh` prevê: cada chamada mede a CPU ao longo de
+cerca de 1 s entre duas leituras do daemon, a seguinte só começa quando a anterior termina, e o
+intervalo entre linhas, por isso, não é fixado e é medido a partir do arquivo. Fica registrado
+porque a resolução temporal da CPU de pico é de cerca de 2 s.

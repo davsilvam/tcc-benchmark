@@ -1,0 +1,10 @@
+=== estado de energia do host no inicio da campanha ===
+registrado_em=2026-10-24T14:51:27.6330857-03:00
+plano_ativo=85d583c5-cf2e-4197-80fd-3789a227a72c  (Legion Balance Mode)
+overlay_ca=ded574b5-45a0-4f42-8737-46345c09c238  (ded574b5-... = desempenho maximo)
+suspensao_ca=0x00000000  hibernacao_ca=0x00000000  (0x00000000 = nunca)
+bateria_status=2  (2 = conectado a CA)  carga=100%
+
+taxas=106 212 318 req/s (C_min=425, results/capacity-desempenho)
+order_seed=20260922
+protocolo=protocolo-v4 (2b1a729)
