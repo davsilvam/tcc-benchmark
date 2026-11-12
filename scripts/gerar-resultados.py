@@ -40,8 +40,9 @@ MODELO SAW. Três dimensões de peso igual (1/3):
   produtividade = SLOC-A (custo);
   comunidade   = média de [estrelas, forks, C3], todos benefício.
 
-SENSIBILIDADE. Cada configuração muda UM eixo em relação ao cenário base e é comparada a ele
-pelo τ de Kendall na versão tau-a: (concordantes − discordantes) / [n(n−1)/2], com pares
+SENSIBILIDADE. 21 configurações (base + 20): 3 pesos, 3 normalizações, 2 variantes de C3,
+SLOC-B, cargas de 106 e 318 req/s, latência média e 8 tetos de latência. Cada uma muda UM eixo
+em relação ao cenário base e é comparada a ele pelo τ de Kendall na versão tau-a: (concordantes − discordantes) / [n(n−1)/2], com pares
 empatados contando zero.
 """
 import sys
@@ -186,7 +187,7 @@ def normalizar(valores, beneficio, tecnica):
             n = [(x - lo) / (hi - lo) for x in v]
         else:
             n = [(hi - x) / (hi - lo) for x in v]
-    elif tecnica == 'maximo':
+    elif tecnica == 'máximo':
         hi = max(v)
         n = [x / hi for x in v] if beneficio else [1 - x / hi for x in v]
     elif tecnica == 'soma':
@@ -244,6 +245,47 @@ def kendall_tau_a(ordem_a, ordem_b):
     return (conc - disc) / (n * (n - 1) / 2)
 
 
+def _postos(valores):
+    """Postos de 1 a n, com a média dos postos nos empates."""
+    fws = list(valores)
+    ordem = sorted(fws, key=lambda fw: valores[fw])
+    postos = {}
+    i = 0
+    while i < len(ordem):
+        j = i
+        while j + 1 < len(ordem) and valores[ordem[j + 1]] == valores[ordem[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            postos[ordem[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return postos
+
+
+def kendall_valores(a, b):
+    """τ de Kendall, versão tau-a (empates contam zero), entre dois critérios."""
+    fws = list(a)
+    conc = disc = 0
+    for i in range(len(fws)):
+        for j in range(i + 1, len(fws)):
+            s = (a[fws[i]] - a[fws[j]]) * (b[fws[i]] - b[fws[j]])
+            conc += s > 0
+            disc += s < 0
+    n = len(fws)
+    return (conc - disc) / (n * (n - 1) / 2)
+
+
+def spearman(a, b):
+    """ρ de Spearman: correlação de Pearson entre os postos."""
+    pa, pb = _postos(a), _postos(b)
+    fws = list(a)
+    ma = sum(pa.values()) / len(fws)
+    mb = sum(pb.values()) / len(fws)
+    cov = sum((pa[f] - ma) * (pb[f] - mb) for f in fws)
+    va = math.sqrt(sum((pa[f] - ma) ** 2 for f in fws))
+    vb = math.sqrt(sum((pb[f] - mb) ** 2 for f in fws))
+    return cov / (va * vb)
+
+
 def cruzamento_peso_desempenho(dims, a, b):
     """Peso w do desempenho em que a e b empatam, com as outras duas dimensões a (1-w)/2."""
     da = dims[a]['desempenho'] - dims[b]['desempenho']
@@ -285,6 +327,11 @@ def medias_por_taxa(execucoes):
     return saida
 
 
+def _br(texto):
+    """Vírgula decimal nos rótulos das figuras."""
+    return texto.replace('.', ',')
+
+
 def figuras(saida, m212, cap_base, dims_base, configs):
     try:
         import matplotlib
@@ -302,8 +349,14 @@ def figuras(saida, m212, cap_base, dims_base, configs):
         'axes.facecolor': 'white', 'savefig.dpi': 200, 'savefig.bbox': 'tight',
     })
     gerados = []
+    from matplotlib.ticker import FuncFormatter
+    eixo_virgula = FuncFormatter(lambda v, _: ('%g' % v).replace('.', ','))
 
-    def salvar(fig, nome):
+    def salvar(fig, nome, eixo_numerico=True):
+        # Vírgula decimal no eixo x numérico; a figura 5 tem os nomes dos frameworks nele.
+        if eixo_numerico:
+            for ax in fig.axes:
+                ax.xaxis.set_major_formatter(eixo_virgula)
         caminho = os.path.join(saida, nome)
         fig.savefig(caminho)
         plt.close(fig)
@@ -319,7 +372,7 @@ def figuras(saida, m212, cap_base, dims_base, configs):
         ax.barh(i, r['media'], color=COR[fw], height=0.55)
         ax.errorbar(r['media'], i, xerr=r['ic'], fmt='none', ecolor='#0b0b0b', capsize=4,
                     linewidth=1.2)
-        ax.text(r['media'] + r['ic'] + 0.12, i, '%.2f ± %.2f' % (r['media'], r['ic']),
+        ax.text(r['media'] + r['ic'] + 0.12, i, _br('%.2f ± %.2f' % (r['media'], r['ic'])),
                 va='center', fontsize=9, color='#0b0b0b')
     ax.set_yticks(range(len(ordem_p95)), [ROTULO[fw] for fw in ordem_p95])
     ax.invert_yaxis()
@@ -361,7 +414,7 @@ def figuras(saida, m212, cap_base, dims_base, configs):
             ax.barh(i, r['media'], color=COR[fw], height=0.55)
             ax.errorbar(r['media'], i, xerr=r['ic'], fmt='none', ecolor='#0b0b0b', capsize=3,
                         linewidth=1)
-            ax.text(r['media'] + r['ic'], i, '  %.1f' % r['media'], va='center', fontsize=9)
+            ax.text(r['media'] + r['ic'], i, _br('  %.1f' % r['media']), va='center', fontsize=9)
         ax.set_xlabel(rotulo)
         ax.grid(axis='y', visible=False)
         ax.set_xlim(0, max(m212[fw][chave]['media'] for fw in FRAMEWORKS) * 1.25)
@@ -385,7 +438,7 @@ def figuras(saida, m212, cap_base, dims_base, configs):
             ax.barh(i, largura, left=esquerda, color=COR_DIM[d], height=0.55,
                     edgecolor='white', linewidth=2, label=d if i == 0 else None)
             esquerda += largura
-        ax.text(esquerda + 0.01, i, '%.3f' % dims_base[fw]['saw'], va='center', fontsize=9)
+        ax.text(esquerda + 0.01, i, _br('%.3f' % dims_base[fw]['saw']), va='center', fontsize=9)
     ax.set_yticks(range(len(ordem_saw)), [ROTULO[fw] for fw in ordem_saw])
     ax.invert_yaxis()
     ax.set_xlim(0, 1)
@@ -406,7 +459,7 @@ def figuras(saida, m212, cap_base, dims_base, configs):
                                        linewidth=0))
             ax.text(FRAMEWORKS.index(fw), j, str(pos), ha='center', va='center', fontsize=8,
                     color='white' if pos <= 2 else '#0b0b0b')
-        ax.text(len(FRAMEWORKS) - 0.35, j, 'τ = %.1f' % c['tau'], va='center', fontsize=8,
+        ax.text(len(FRAMEWORKS) - 0.35, j, _br('τ = %.1f' % c['tau']), va='center', fontsize=8,
                 color='#52514e')
     ax.set_xlim(-0.5, len(FRAMEWORKS) + 0.4)
     ax.set_ylim(len(nomes) - 0.5, -0.5)
@@ -417,9 +470,8 @@ def figuras(saida, m212, cap_base, dims_base, configs):
     for s in ax.spines.values():
         s.set_visible(False)
     ax.tick_params(length=0)
-    ax.set_title('Posição no ordenamento SAW por configuração (1 = melhor)', loc='left',
-                 fontsize=11, pad=24)
-    salvar(fig, 'fig5-mapa-posicoes.png')
+    # Sem título: a legenda da figura fica no texto da monografia.
+    salvar(fig, 'fig5-mapa-posicoes.png', eixo_numerico=False)
     return gerados
 
 
@@ -528,11 +580,11 @@ def main():
     for d in DIMENSOES:
         pesos = {x: (0.50 if x == d else 0.25) for x in DIMENSOES}
         configs.append(('peso %s 0,50' % d, crit_base, pesos, 'max-min'))
-    # As normalizações alternativas NÃO integram as 18 configurações da sensibilidade: são
-    # verificação à parte da escolha da técnica, reportada em tabela própria e fora da
-    # contagem de 1º lugar, do τ mínimo e da figura 5.
+    # As normalizações alternativas integram as configurações da sensibilidade (base + 20) e
+    # são repetidas em tabela própria, com a diferença ASP.NET Core − Django.
     normalizacoes = [('normalização %s' % tec, crit_base, PESOS_BASE, tec)
-                     for tec in ('maximo', 'soma', 'vetorial')]
+                     for tec in ('máximo', 'soma', 'vetorial')]
+    configs.extend(normalizacoes)
     configs.append(('C3 sem exigir revisão', criterios(c3=c3_sem_rev), PESOS_BASE, 'max-min'))
     if all(extra[fw]['prs_abertos'] is not None for fw in FRAMEWORKS):
         configs.append(('C3 por PRs abertos',
@@ -570,7 +622,23 @@ def main():
     resultados = avaliar(configs)
     res_normalizacoes = avaliar(normalizacoes)
     gravar_ordenamentos('tabela-sensibilidade.csv', resultados)
-    gravar_ordenamentos('tabela-normalizacoes.csv', res_normalizacoes)
+    escrever_csv(
+        os.path.join(args.saida, 'tabela-normalizacoes.csv'),
+        ['tecnica', 'tau_a'] + ['saw_' + fw for fw in FRAMEWORKS]
+        + ['dif_aspnet_django', 'ordenamento'],
+        [[r['nome'], r['tau']] + [r['dims'][fw]['saw'] for fw in FRAMEWORKS]
+         + [r['dims']['aspnet']['saw'] - r['dims']['django']['saw'],
+            ' > '.join(ROTULO[fw] for fw in r['ordem'])]
+         for r in [dict(resultados[0], nome='max-min (base)')] + res_normalizacoes])
+
+    # -- correlação entre os indicadores de comunidade (n = 5)
+    ind = {'estrelas': crit_base['estrelas'], 'forks': crit_base['forks'], 'c3': crit_base['c3']}
+    pares = [('estrelas', 'forks'), ('estrelas', 'c3'), ('forks', 'c3')]
+    escrever_csv(
+        os.path.join(args.saida, 'tabela-correlacao-comunidade.csv'),
+        ['indicador_a', 'indicador_b', 'n', 'kendall_tau_a', 'spearman_rho'],
+        [[a, b, len(FRAMEWORKS), kendall_valores(ind[a], ind[b]),
+          spearman(ind[a], ind[b])] for a, b in pares])
 
     escrever_csv(
         os.path.join(args.saida, 'tabela-capacidade-por-teto.csv'),
@@ -590,9 +658,16 @@ def main():
                                    sorted(primeiros.items(), key=lambda x: -x[1])))
     pior = min(resultados, key=lambda r: r['tau'])
     print('τ mínimo = %.1f (%s)' % (pior['tau'], pior['nome']))
-    print('normalizações, à parte: ' + '; '.join(
-        '%s τ = %.1f, 1º %s' % (r['nome'], r['tau'], ROTULO[r['ordem'][0]])
+    print('normalizações: ' + '; '.join(
+        '%s τ = %.1f, ASP.NET Core − Django = %.3f' % (
+            r['nome'], r['tau'], r['dims']['aspnet']['saw'] - r['dims']['django']['saw'])
         for r in res_normalizacoes))
+    menor_sb = min(resultados, key=lambda r: r['dims']['springboot']['saw'])
+    print('menor SAW do Spring Boot: %.3f (%s)' % (menor_sb['dims']['springboot']['saw'],
+                                                   menor_sb['nome']))
+    print('correlações (n = 5): ' + '; '.join(
+        '%s × %s τ = %.1f ρ = %.1f' % (a, b, kendall_valores(ind[a], ind[b]),
+                                       spearman(ind[a], ind[b])) for a, b in pares))
     w = cruzamento_peso_desempenho(dims_base, 'aspnet', 'django')
     print('ASP.NET Core e Django empatam com peso de desempenho w = %.4f '
           '(produtividade e comunidade a (1-w)/2 cada)' % w)

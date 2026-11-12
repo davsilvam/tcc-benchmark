@@ -1,0 +1,4 @@
+indicador_a,indicador_b,n,kendall_tau_a,spearman_rho
+estrelas,forks,5,0.2,0.5
+estrelas,c3,5,0,-0.1
+forks,c3,5,0,0.1

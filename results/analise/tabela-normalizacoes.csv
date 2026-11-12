@@ -1,0 +1,5 @@
+tecnica,tau_a,saw_springboot,saw_django,saw_nestjs,saw_laravel,saw_aspnet,dif_aspnet_django,ordenamento
+max-min (base),1,0.732234,0.757313,0.622702,0.0730175,0.758416,0.00110371,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+normalização máximo,1,0.632281,0.67167,0.549993,0.144377,0.697838,0.0261682,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+normalização soma,1,0.217532,0.247901,0.171121,0.0894822,0.273964,0.026063,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+normalização vetorial,1,0.577224,0.618912,0.519866,0.197531,0.650277,0.0313649,ASP.NET Core > Django > Spring Boot > NestJS > Laravel

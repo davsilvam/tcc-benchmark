@@ -1,0 +1,22 @@
+configuracao,tau_a,pos_springboot,pos_django,pos_nestjs,pos_laravel,pos_aspnet,saw_springboot,saw_django,saw_nestjs,saw_laravel,saw_aspnet,ordenamento
+base,1,3,2,4,5,1,0.732234,0.757313,0.622702,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+"peso desempenho 0,50",0.8,2,3,4,5,1,0.726857,0.687062,0.660772,0.0964298,0.793044,ASP.NET Core > Spring Boot > Django > NestJS > Laravel
+"peso produtividade 0,50",1,3,2,4,5,1,0.764245,0.813244,0.677606,0.0547631,0.818812,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+"peso comunidade 0,50",0.6,2,1,4,5,3,0.705599,0.771632,0.529729,0.0678596,0.663394,Django > Spring Boot > ASP.NET Core > NestJS > Laravel
+normalização máximo,1,3,2,4,5,1,0.632281,0.67167,0.549993,0.144377,0.697838,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+normalização soma,1,3,2,4,5,1,0.217532,0.247901,0.171121,0.0894822,0.273964,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+normalização vetorial,1,3,2,4,5,1,0.577224,0.618912,0.519866,0.197531,0.650277,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+C3 sem exigir revisão,0.4,1,2,4,5,3,0.734772,0.726528,0.622702,0.178057,0.68727,Spring Boot > Django > ASP.NET Core > NestJS > Laravel
+C3 por PRs abertos,0.6,2,1,4,5,3,0.727984,0.793135,0.629985,0.0714091,0.72318,Django > Spring Boot > ASP.NET Core > NestJS > Laravel
+SLOC-B,0.8,3,1,4,5,2,0.554385,0.763633,0.501997,0.0730175,0.750166,Django > ASP.NET Core > Spring Boot > NestJS > Laravel
+carga 106 req/s,0.8,3,1,4,5,2,0.732234,0.758065,0.62621,0.0730175,0.755715,Django > ASP.NET Core > Spring Boot > NestJS > Laravel
+carga 318 req/s,1,3,2,4,5,1,0.732234,0.756405,0.623496,0.0730175,0.760721,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+latência média,1,3,2,4,5,1,0.732234,0.756334,0.627145,0.0730175,0.771397,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 25 ms,1,3,2,4,5,1,0.739347,0.757216,0.618047,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 50 ms,1,3,2,4,5,1,0.732234,0.756036,0.617594,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 75 ms,1,3,2,4,5,1,0.732234,0.757313,0.622702,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 100 ms,1,3,2,4,5,1,0.732234,0.757313,0.622702,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 150 ms,1,3,2,4,5,1,0.731436,0.757008,0.621962,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 200 ms,1,3,2,4,5,1,0.731436,0.757008,0.621962,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 300 ms,1,3,2,4,5,1,0.731436,0.758271,0.621962,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel
+teto p95 500 ms,1,3,2,4,5,1,0.731436,0.758271,0.621962,0.0730175,0.758416,ASP.NET Core > Django > Spring Boot > NestJS > Laravel

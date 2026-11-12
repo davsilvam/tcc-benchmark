@@ -1,0 +1,6 @@
+framework,rep01,rep02,rep03,rep04,rep05,resumo,criterio
+Spring Boot,1700,1800,1925,1825,1775,1800,mediana
+Django,950,975,950,925,950,950,moda
+NestJS,1675,1725,1700,1600,1700,1700,mediana
+Laravel,375,400,425,425,425,425,moda
+ASP.NET Core,2700,2575,2475,2625,2600,2600,mediana
